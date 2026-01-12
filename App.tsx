@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,9 +11,22 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  Switch,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+// ============ SUPABASE CONFIG ============
+const SUPABASE_URL = 'https://wektbfkzbxvtxsremnnk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indla3RiZmt6Ynh2dHhzcmVtbm5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDcyNjMsImV4cCI6MjA4MTQyMzI2M30.-oLnJRoDBpqgzDZ7bM3fm6TXBNGH6SaRpnKDiHQZ3_4';
+
+let supabase: SupabaseClient;
+try {
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  console.error('Supabase init error:', e);
+}
 
 // ============ TYPES ============
 interface Message {
@@ -42,6 +55,12 @@ interface UserMemory {
   remembered: string[];
 }
 
+interface VoiceOption {
+  id: string;
+  name: string;
+  description: string;
+}
+
 // ============ CONSTANTS ============
 const COLORS = {
   bg: '#0a0a0f',
@@ -55,7 +74,25 @@ const COLORS = {
   listening: '#ef4444',
   speaking: '#22c55e',
   live: '#f59e0b',
+  sync: '#3b82f6',
 };
+
+const VOICE_OPTIONS: VoiceOption[] = [
+  { id: 'Aoede', name: 'Aoede', description: 'Warm & friendly' },
+  { id: 'Charon', name: 'Charon', description: 'Calm & steady' },
+  { id: 'Fenrir', name: 'Fenrir', description: 'Direct & energetic' },
+  { id: 'Kore', name: 'Kore', description: 'Gentle & supportive' },
+  { id: 'Puck', name: 'Puck', description: 'Playful & light' },
+];
+
+const CHECKIN_MESSAGES = [
+  "Hey, just checking in. How's it going?",
+  "Thinking of you. What are you working on?",
+  "Quick check - how are you feeling right now?",
+  "You've been quiet. Everything okay?",
+  "Just popping in. Need any help getting started on something?",
+  "Hey. What's one small thing we could tackle together?",
+];
 
 const NERO_PERSONA = `You are Nero, an AI companion for someone with ADHD.
 
@@ -74,11 +111,19 @@ RULES:
 
 FOR VOICE:
 - Speak naturally, conversationally.
-- Shorter is better. This is a real conversation.
-- React to their tone and energy.`;
+- Shorter is better. This is a real conversation.`;
 
 // ============ HELPERS ============
 const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+
+const getDeviceId = async (): Promise<string> => {
+  let deviceId = await AsyncStorage.getItem('@nero/deviceId');
+  if (!deviceId) {
+    deviceId = 'device_' + generateId();
+    await AsyncStorage.setItem('@nero/deviceId', deviceId);
+  }
+  return deviceId;
+};
 
 const getTimeOfDay = () => {
   const hour = new Date().getHours();
@@ -88,10 +133,207 @@ const getTimeOfDay = () => {
   return 'night';
 };
 
+// ============ SUPABASE SERVICE ============
+class SyncService {
+  private userId: string | null = null;
+  private deviceId: string | null = null;
+  private syncEnabled: boolean = true;
+
+  async initialize(): Promise<string | null> {
+    try {
+      this.deviceId = await getDeviceId();
+      
+      // Get or create user
+      const { data: existing } = await supabase
+        .from('nero_users')
+        .select('id')
+        .eq('device_id', this.deviceId)
+        .single();
+
+      if (existing) {
+        this.userId = existing.id;
+        await supabase
+          .from('nero_users')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('id', this.userId);
+      } else {
+        const { data: newUser } = await supabase
+          .from('nero_users')
+          .insert({ device_id: this.deviceId })
+          .select('id')
+          .single();
+        
+        if (newUser) {
+          this.userId = newUser.id;
+        }
+      }
+
+      return this.userId;
+    } catch (error) {
+      console.error('Sync init error:', error);
+      return null;
+    }
+  }
+
+  async syncMemory(memory: UserMemory): Promise<void> {
+    if (!this.userId || !this.syncEnabled) return;
+
+    try {
+      await supabase
+        .from('nero_memory')
+        .upsert({
+          user_id: this.userId,
+          name: memory.facts.name,
+          total_conversations: memory.facts.totalConversations,
+          commitments: memory.threads.commitments,
+          struggles: memory.patterns.knownStruggles,
+          remembered: memory.remembered,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' });
+    } catch (error) {
+      console.error('Memory sync error:', error);
+    }
+  }
+
+  async loadMemory(): Promise<UserMemory | null> {
+    if (!this.userId) return null;
+
+    try {
+      const { data } = await supabase
+        .from('nero_memory')
+        .select('*')
+        .eq('user_id', this.userId)
+        .single();
+
+      if (data) {
+        return {
+          facts: {
+            name: data.name,
+            firstSeen: data.created_at || new Date().toISOString(),
+            lastSeen: new Date().toISOString(),
+            totalConversations: data.total_conversations || 0,
+          },
+          threads: {
+            commitments: data.commitments || [],
+            openLoops: [],
+          },
+          patterns: {
+            knownStruggles: data.struggles || [],
+            whatHelps: [],
+          },
+          remembered: data.remembered || [],
+        };
+      }
+    } catch (error) {
+      console.error('Load memory error:', error);
+    }
+    return null;
+  }
+
+  async syncMessage(message: Message): Promise<void> {
+    if (!this.userId || !this.syncEnabled) return;
+
+    try {
+      await supabase
+        .from('nero_messages')
+        .insert({
+          user_id: this.userId,
+          role: message.role,
+          content: message.content,
+          is_voice: message.isVoice || false,
+          created_at: message.timestamp,
+        });
+    } catch (error) {
+      console.error('Message sync error:', error);
+    }
+  }
+
+  async loadMessages(limit: number = 50): Promise<Message[]> {
+    if (!this.userId) return [];
+
+    try {
+      const { data } = await supabase
+        .from('nero_messages')
+        .select('*')
+        .eq('user_id', this.userId)
+        .order('created_at', { ascending: true })
+        .limit(limit);
+
+      if (data) {
+        return data.map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.created_at,
+          isVoice: m.is_voice,
+        }));
+      }
+    } catch (error) {
+      console.error('Load messages error:', error);
+    }
+    return [];
+  }
+
+  async scheduleCheckin(hoursFromNow: number): Promise<void> {
+    if (!this.userId) return;
+
+    const scheduledFor = new Date();
+    scheduledFor.setHours(scheduledFor.getHours() + hoursFromNow);
+
+    try {
+      await supabase
+        .from('nero_checkins')
+        .insert({
+          user_id: this.userId,
+          scheduled_for: scheduledFor.toISOString(),
+          message: CHECKIN_MESSAGES[Math.floor(Math.random() * CHECKIN_MESSAGES.length)],
+        });
+    } catch (error) {
+      console.error('Schedule checkin error:', error);
+    }
+  }
+
+  async getPendingCheckin(): Promise<{ id: string; message: string } | null> {
+    if (!this.userId) return null;
+
+    try {
+      const { data } = await supabase
+        .from('nero_checkins')
+        .select('id, message')
+        .eq('user_id', this.userId)
+        .is('sent_at', null)
+        .lte('scheduled_for', new Date().toISOString())
+        .order('scheduled_for', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (data) {
+        // Mark as sent
+        await supabase
+          .from('nero_checkins')
+          .update({ sent_at: new Date().toISOString() })
+          .eq('id', data.id);
+        
+        return data;
+      }
+    } catch (error) {
+      // No pending checkins is fine
+    }
+    return null;
+  }
+
+  setSyncEnabled(enabled: boolean) {
+    this.syncEnabled = enabled;
+  }
+}
+
+const syncService = new SyncService();
+
 // ============ GEMINI LIVE SERVICE ============
 class GeminiLiveService {
   private ws: WebSocket | null = null;
   private apiKey: string = '';
+  private voiceName: string = 'Aoede';
   private audioContext: AudioContext | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private audioQueue: ArrayBuffer[] = [];
@@ -103,9 +345,8 @@ class GeminiLiveService {
   public onStateChange: ((state: 'idle' | 'listening' | 'thinking' | 'speaking') => void) | null = null;
   public onError: ((error: string) => void) | null = null;
 
-  setApiKey(key: string) {
-    this.apiKey = key;
-  }
+  setApiKey(key: string) { this.apiKey = key; }
+  setVoice(voice: string) { this.voiceName = voice; }
 
   async connect(systemPrompt: string): Promise<boolean> {
     if (!this.apiKey) {
@@ -115,16 +356,13 @@ class GeminiLiveService {
 
     return new Promise((resolve) => {
       try {
-        // Gemini Live API WebSocket endpoint
         const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
         
         this.ws = new WebSocket(wsUrl);
         
         this.ws.onopen = () => {
-          console.log('Gemini Live connected');
           this.isConnected = true;
           
-          // Send setup message
           const setupMessage = {
             setup: {
               model: 'models/gemini-2.5-flash-preview-native-audio-dialog',
@@ -133,7 +371,7 @@ class GeminiLiveService {
                 speechConfig: {
                   voiceConfig: {
                     prebuiltVoiceConfig: {
-                      voiceName: 'Aoede' // Natural female voice
+                      voiceName: this.voiceName
                     }
                   }
                 }
@@ -152,18 +390,15 @@ class GeminiLiveService {
           try {
             const data = JSON.parse(event.data);
             
-            // Handle different message types
             if (data.serverContent) {
               const content = data.serverContent;
               
-              // Text response
               if (content.modelTurn?.parts) {
                 for (const part of content.modelTurn.parts) {
                   if (part.text) {
                     this.onResponse?.(part.text);
                   }
                   if (part.inlineData?.mimeType?.startsWith('audio/')) {
-                    // Queue audio for playback
                     const audioData = this.base64ToArrayBuffer(part.inlineData.data);
                     this.audioQueue.push(audioData);
                     this.playNextAudio();
@@ -171,13 +406,11 @@ class GeminiLiveService {
                 }
               }
               
-              // Turn complete
               if (content.turnComplete) {
                 this.onStateChange?.('idle');
               }
             }
             
-            // Handle user transcript
             if (data.clientContent?.turns) {
               for (const turn of data.clientContent.turns) {
                 if (turn.parts) {
@@ -190,25 +423,22 @@ class GeminiLiveService {
               }
             }
           } catch (e) {
-            console.error('Error parsing Gemini message:', e);
+            console.error('Parse error:', e);
           }
         };
 
-        this.ws.onerror = (error) => {
-          console.error('Gemini WebSocket error:', error);
+        this.ws.onerror = () => {
           this.isConnected = false;
           this.onError?.('Connection error');
           resolve(false);
         };
 
         this.ws.onclose = () => {
-          console.log('Gemini Live disconnected');
           this.isConnected = false;
           this.onStateChange?.('idle');
         };
 
       } catch (error) {
-        console.error('Failed to connect:', error);
         this.onError?.('Failed to connect');
         resolve(false);
       }
@@ -216,16 +446,13 @@ class GeminiLiveService {
   }
 
   async startListening(): Promise<boolean> {
-    if (!this.isConnected || !this.ws) {
-      return false;
-    }
+    if (!this.isConnected || !this.ws) return false;
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
       this.audioContext = new AudioContext({ sampleRate: 16000 });
       
-      // Create MediaRecorder for audio capture
       this.mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
@@ -235,25 +462,21 @@ class GeminiLiveService {
           const arrayBuffer = await event.data.arrayBuffer();
           const base64 = this.arrayBufferToBase64(arrayBuffer);
           
-          // Send audio to Gemini
-          const audioMessage = {
+          this.ws.send(JSON.stringify({
             realtimeInput: {
               mediaChunks: [{
                 mimeType: 'audio/webm;codecs=opus',
                 data: base64
               }]
             }
-          };
-          
-          this.ws.send(JSON.stringify(audioMessage));
+          }));
         }
       };
 
-      this.mediaRecorder.start(100); // Send chunks every 100ms
+      this.mediaRecorder.start(100);
       this.onStateChange?.('listening');
       return true;
     } catch (error) {
-      console.error('Error starting microphone:', error);
       this.onError?.('Microphone access denied');
       return false;
     }
@@ -310,17 +533,12 @@ class GeminiLiveService {
   sendText(text: string) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     
-    const message = {
+    this.ws.send(JSON.stringify({
       clientContent: {
-        turns: [{
-          role: 'user',
-          parts: [{ text }]
-        }],
+        turns: [{ role: 'user', parts: [{ text }] }],
         turnComplete: true
       }
-    };
-    
-    this.ws.send(JSON.stringify(message));
+    }));
     this.onStateChange?.('thinking');
   }
 
@@ -343,10 +561,9 @@ class GeminiLiveService {
   }
 }
 
-// Singleton
 const geminiLive = new GeminiLiveService();
 
-// ============ FALLBACK TEXT API ============
+// ============ TEXT API ============
 const callNeroText = async (
   messages: Message[],
   memory: UserMemory,
@@ -372,10 +589,7 @@ const callNeroText = async (
           systemInstruction: {
             parts: [{ text: `${NERO_PERSONA}\n\n${memoryContext}` }]
           },
-          generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.8
-          }
+          generationConfig: { maxOutputTokens: 300, temperature: 0.8 }
         })
       }
     );
@@ -385,17 +599,13 @@ const callNeroText = async (
     const data = await response.json();
     return data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm here. What's going on?";
   } catch (error) {
-    console.error('Gemini error:', error);
     return getFallbackResponse(messages, memory);
   }
 };
 
 const buildMemoryContext = (memory: UserMemory): string => {
   const parts: string[] = ['ABOUT THIS PERSON:'];
-
-  if (memory.facts.name) {
-    parts.push(`- Name: ${memory.facts.name}`);
-  }
+  if (memory.facts.name) parts.push(`- Name: ${memory.facts.name}`);
   parts.push(`- Conversations: ${memory.facts.totalConversations}`);
 
   if (memory.threads.commitments.length > 0) {
@@ -419,7 +629,6 @@ const buildMemoryContext = (memory: UserMemory): string => {
 const getFallbackResponse = (messages: Message[], memory: UserMemory): string => {
   const lastMessage = messages[messages.length - 1]?.content.toLowerCase() || '';
   const name = memory.facts.name;
-  const timeOfDay = getTimeOfDay();
 
   if (memory.facts.totalConversations === 0) {
     return "Hey. I'm Nero. I'm here to help you actually do things, not just plan them. What's on your mind?";
@@ -466,6 +675,14 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [geminiKey, setGeminiKey] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'general' | 'voice' | 'sync'>('general');
+
+  // Settings
+  const [syncEnabled, setSyncEnabled] = useState(true);
+  const [checkinsEnabled, setCheckinsEnabled] = useState(true);
+  const [checkinInterval, setCheckinInterval] = useState(4); // hours
+  const [selectedVoice, setSelectedVoice] = useState('Aoede');
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('offline');
 
   // Live voice state
   const [liveState, setLiveState] = useState<'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking'>('idle');
@@ -475,7 +692,7 @@ export default function App() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollRef = useRef<ScrollView>(null);
 
-  // Pulse animation for live mode
+  // Pulse animation
   useEffect(() => {
     if (liveState === 'listening') {
       Animated.loop(
@@ -489,15 +706,38 @@ export default function App() {
     }
   }, [liveState]);
 
-  // Load data
+  // Initialize
   useEffect(() => {
-    loadData();
+    initializeApp();
   }, []);
 
-  // Save data
+  // Check for proactive check-ins
   useEffect(() => {
-    if (!isLoading) saveData();
-  }, [messages, memory, geminiKey]);
+    if (!checkinsEnabled) return;
+    
+    const checkForCheckins = async () => {
+      const checkin = await syncService.getPendingCheckin();
+      if (checkin) {
+        addMessage('nero', checkin.message);
+      }
+    };
+
+    const interval = setInterval(checkForCheckins, 60000); // Check every minute
+    checkForCheckins();
+    
+    return () => clearInterval(interval);
+  }, [checkinsEnabled]);
+
+  // Save data when it changes
+  useEffect(() => {
+    if (!isLoading) {
+      saveData();
+      if (syncEnabled) {
+        syncService.syncMemory(memory);
+        setSyncStatus('synced');
+      }
+    }
+  }, [messages, memory, geminiKey, syncEnabled, checkinsEnabled, checkinInterval, selectedVoice]);
 
   // Auto-scroll
   useEffect(() => {
@@ -533,33 +773,82 @@ export default function App() {
     };
   }, []);
 
-  const loadData = async () => {
+  const initializeApp = async () => {
     try {
-      const [savedMessages, savedMemory, savedKey] = await Promise.all([
-        AsyncStorage.getItem('@nero/messages'),
-        AsyncStorage.getItem('@nero/memory'),
+      // Load local settings first
+      const [savedKey, savedSync, savedCheckins, savedInterval, savedVoice] = await Promise.all([
         AsyncStorage.getItem('@nero/geminiKey'),
+        AsyncStorage.getItem('@nero/syncEnabled'),
+        AsyncStorage.getItem('@nero/checkinsEnabled'),
+        AsyncStorage.getItem('@nero/checkinInterval'),
+        AsyncStorage.getItem('@nero/selectedVoice'),
       ]);
 
-      if (savedMessages) setMessages(JSON.parse(savedMessages));
       if (savedKey) {
         const key = JSON.parse(savedKey);
         setGeminiKey(key);
         geminiLive.setApiKey(key);
       }
+      if (savedSync !== null) setSyncEnabled(JSON.parse(savedSync));
+      if (savedCheckins !== null) setCheckinsEnabled(JSON.parse(savedCheckins));
+      if (savedInterval) setCheckinInterval(JSON.parse(savedInterval));
+      if (savedVoice) {
+        const voice = JSON.parse(savedVoice);
+        setSelectedVoice(voice);
+        geminiLive.setVoice(voice);
+      }
 
-      if (savedMemory) {
-        const parsed = JSON.parse(savedMemory);
-        parsed.facts.lastSeen = new Date().toISOString();
-        parsed.facts.totalConversations = (parsed.facts.totalConversations || 0) + 1;
-        setMemory(parsed);
+      // Initialize sync
+      setSyncStatus('syncing');
+      const userId = await syncService.initialize();
+      
+      if (userId) {
+        // Try to load from cloud first
+        const cloudMemory = await syncService.loadMemory();
+        const cloudMessages = await syncService.loadMessages();
+        
+        if (cloudMemory && cloudMessages.length > 0) {
+          setMemory(cloudMemory);
+          setMessages(cloudMessages);
+          setSyncStatus('synced');
+        } else {
+          // Fall back to local
+          await loadLocalData();
+          setSyncStatus('synced');
+        }
       } else {
-        addMessage('nero', "Hey. I'm Nero. I'm here to help you actually do things, not just plan them. What's on your mind?");
+        await loadLocalData();
+        setSyncStatus('offline');
+      }
+
+      // Schedule next check-in if enabled
+      if (checkinsEnabled) {
+        syncService.scheduleCheckin(checkinInterval);
       }
     } catch (error) {
-      console.error('Load error:', error);
+      console.error('Init error:', error);
+      await loadLocalData();
+      setSyncStatus('offline');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadLocalData = async () => {
+    const [savedMessages, savedMemory] = await Promise.all([
+      AsyncStorage.getItem('@nero/messages'),
+      AsyncStorage.getItem('@nero/memory'),
+    ]);
+
+    if (savedMessages) setMessages(JSON.parse(savedMessages));
+    
+    if (savedMemory) {
+      const parsed = JSON.parse(savedMemory);
+      parsed.facts.lastSeen = new Date().toISOString();
+      parsed.facts.totalConversations = (parsed.facts.totalConversations || 0) + 1;
+      setMemory(parsed);
+    } else {
+      addMessage('nero', "Hey. I'm Nero. I'm here to help you actually do things, not just plan them. What's on your mind?");
     }
   };
 
@@ -569,13 +858,17 @@ export default function App() {
         AsyncStorage.setItem('@nero/messages', JSON.stringify(messages.slice(-100))),
         AsyncStorage.setItem('@nero/memory', JSON.stringify(memory)),
         AsyncStorage.setItem('@nero/geminiKey', JSON.stringify(geminiKey)),
+        AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled)),
+        AsyncStorage.setItem('@nero/checkinsEnabled', JSON.stringify(checkinsEnabled)),
+        AsyncStorage.setItem('@nero/checkinInterval', JSON.stringify(checkinInterval)),
+        AsyncStorage.setItem('@nero/selectedVoice', JSON.stringify(selectedVoice)),
       ]);
     } catch (error) {
       console.error('Save error:', error);
     }
   };
 
-  const addMessage = (role: 'user' | 'nero', content: string, isVoice: boolean = false) => {
+  const addMessage = useCallback((role: 'user' | 'nero', content: string, isVoice: boolean = false) => {
     const msg: Message = {
       id: generateId(),
       role,
@@ -583,7 +876,13 @@ export default function App() {
       timestamp: new Date().toISOString(),
       isVoice,
     };
+    
     setMessages(prev => [...prev, msg]);
+    
+    // Sync to cloud
+    if (syncEnabled) {
+      syncService.syncMessage(msg);
+    }
 
     // Extract memories from user messages
     if (role === 'user') {
@@ -604,8 +903,13 @@ export default function App() {
           return updated;
         });
       }
+      
+      // Reschedule check-in since user is active
+      if (checkinsEnabled) {
+        syncService.scheduleCheckin(checkinInterval);
+      }
     }
-  };
+  }, [syncEnabled, checkinsEnabled, checkinInterval]);
 
   const sendTextMessage = async () => {
     const text = input.trim();
@@ -628,6 +932,7 @@ export default function App() {
 
     setLiveState('connecting');
     geminiLive.setApiKey(geminiKey);
+    geminiLive.setVoice(selectedVoice);
     
     const memoryContext = buildMemoryContext(memory);
     const connected = await geminiLive.connect(`${NERO_PERSONA}\n\n${memoryContext}`);
@@ -666,6 +971,7 @@ export default function App() {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -683,49 +989,161 @@ export default function App() {
           <View style={{ width: 50 }} />
         </View>
 
-        <ScrollView style={styles.settingsContent}>
-          <View style={styles.settingsSection}>
-            <Text style={styles.settingsLabel}>Gemini API Key</Text>
-            <Text style={styles.settingsHint}>Required for live voice and smart responses</Text>
-            <TextInput
-              style={styles.settingsInput}
-              value={geminiKey}
-              onChangeText={(t) => {
-                setGeminiKey(t);
-                geminiLive.setApiKey(t);
-              }}
-              placeholder="AIza..."
-              placeholderTextColor={COLORS.textDim}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.settingsSection}>
-            <Text style={styles.settingsLabel}>What Nero Knows</Text>
-            {memory.facts.name && <Text style={styles.memoryItem}>• Name: {memory.facts.name}</Text>}
-            <Text style={styles.memoryItem}>• Conversations: {memory.facts.totalConversations}</Text>
-            {memory.threads.commitments.map((c, i) => (
-              <Text key={i} style={styles.memoryItem}>• Wants to: {c}</Text>
-            ))}
-          </View>
-
-          <View style={styles.settingsSection}>
-            <TouchableOpacity style={styles.dangerButton} onPress={async () => {
-              await AsyncStorage.clear();
-              setMessages([]);
-              setMemory({
-                facts: { firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), totalConversations: 0 },
-                threads: { commitments: [], openLoops: [] },
-                patterns: { knownStruggles: [], whatHelps: [] },
-                remembered: [],
-              });
-              setShowSettings(false);
-              addMessage('nero', "Hey. I'm Nero. Fresh start. What's on your mind?");
-            }}>
-              <Text style={styles.dangerButtonText}>Reset Everything</Text>
+        {/* Tabs */}
+        <View style={styles.tabBar}>
+          {(['general', 'voice', 'sync'] as const).map(tab => (
+            <TouchableOpacity 
+              key={tab} 
+              style={[styles.tab, settingsTab === tab && styles.tabActive]}
+              onPress={() => setSettingsTab(tab)}
+            >
+              <Text style={[styles.tabText, settingsTab === tab && styles.tabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
             </TouchableOpacity>
-          </View>
+          ))}
+        </View>
+
+        <ScrollView style={styles.settingsContent}>
+          {/* General Tab */}
+          {settingsTab === 'general' && (
+            <>
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Gemini API Key</Text>
+                <Text style={styles.settingsHint}>Required for AI responses</Text>
+                <TextInput
+                  style={styles.settingsInput}
+                  value={geminiKey}
+                  onChangeText={(t) => {
+                    setGeminiKey(t);
+                    geminiLive.setApiKey(t);
+                  }}
+                  placeholder="AIza..."
+                  placeholderTextColor={COLORS.textDim}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>What Nero Knows</Text>
+                {memory.facts.name && <Text style={styles.memoryItem}>• Name: {memory.facts.name}</Text>}
+                <Text style={styles.memoryItem}>• Conversations: {memory.facts.totalConversations}</Text>
+                {memory.threads.commitments.map((c, i) => (
+                  <Text key={i} style={styles.memoryItem}>• Wants to: {c}</Text>
+                ))}
+              </View>
+
+              <View style={styles.settingsSection}>
+                <TouchableOpacity style={styles.dangerButton} onPress={async () => {
+                  await AsyncStorage.clear();
+                  setMessages([]);
+                  setMemory({
+                    facts: { firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), totalConversations: 0 },
+                    threads: { commitments: [], openLoops: [] },
+                    patterns: { knownStruggles: [], whatHelps: [] },
+                    remembered: [],
+                  });
+                  setShowSettings(false);
+                  addMessage('nero', "Hey. I'm Nero. Fresh start. What's on your mind?");
+                }}>
+                  <Text style={styles.dangerButtonText}>Reset Everything</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {/* Voice Tab */}
+          {settingsTab === 'voice' && (
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Nero's Voice</Text>
+              <Text style={styles.settingsHint}>Choose how Nero sounds in live mode</Text>
+              
+              {VOICE_OPTIONS.map(voice => (
+                <TouchableOpacity
+                  key={voice.id}
+                  style={[styles.voiceOption, selectedVoice === voice.id && styles.voiceOptionSelected]}
+                  onPress={() => {
+                    setSelectedVoice(voice.id);
+                    geminiLive.setVoice(voice.id);
+                  }}
+                >
+                  <View>
+                    <Text style={styles.voiceOptionName}>{voice.name}</Text>
+                    <Text style={styles.voiceOptionDesc}>{voice.description}</Text>
+                  </View>
+                  {selectedVoice === voice.id && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Sync Tab */}
+          {settingsTab === 'sync' && (
+            <>
+              <View style={styles.settingsSection}>
+                <View style={styles.syncStatus}>
+                  <View style={[styles.syncDot, { backgroundColor: syncStatus === 'synced' ? COLORS.speaking : syncStatus === 'syncing' ? COLORS.live : COLORS.textDim }]} />
+                  <Text style={styles.syncStatusText}>
+                    {syncStatus === 'synced' ? 'Synced to cloud' : syncStatus === 'syncing' ? 'Syncing...' : 'Offline'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Cloud Sync</Text>
+                <View style={styles.settingRow}>
+                  <View>
+                    <Text style={styles.settingRowText}>Sync across devices</Text>
+                    <Text style={styles.settingRowHint}>Memory and conversations sync to cloud</Text>
+                  </View>
+                  <Switch
+                    value={syncEnabled}
+                    onValueChange={(v) => {
+                      setSyncEnabled(v);
+                      syncService.setSyncEnabled(v);
+                    }}
+                    trackColor={{ false: COLORS.surface, true: COLORS.primary }}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Proactive Check-ins</Text>
+                <View style={styles.settingRow}>
+                  <View>
+                    <Text style={styles.settingRowText}>Nero checks on you</Text>
+                    <Text style={styles.settingRowHint}>Get a message if you've been quiet</Text>
+                  </View>
+                  <Switch
+                    value={checkinsEnabled}
+                    onValueChange={setCheckinsEnabled}
+                    trackColor={{ false: COLORS.surface, true: COLORS.primary }}
+                  />
+                </View>
+                
+                {checkinsEnabled && (
+                  <View style={styles.intervalPicker}>
+                    <Text style={styles.intervalLabel}>Check in every:</Text>
+                    <View style={styles.intervalOptions}>
+                      {[2, 4, 8, 12].map(hours => (
+                        <TouchableOpacity
+                          key={hours}
+                          style={[styles.intervalOption, checkinInterval === hours && styles.intervalOptionSelected]}
+                          onPress={() => setCheckinInterval(hours)}
+                        >
+                          <Text style={[styles.intervalOptionText, checkinInterval === hours && styles.intervalOptionTextSelected]}>
+                            {hours}h
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -737,7 +1155,6 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
         <View style={styles.liveContainer}>
-          {/* Status */}
           <Text style={styles.liveStatus}>
             {liveState === 'connecting' && 'Connecting...'}
             {liveState === 'listening' && 'Listening...'}
@@ -746,12 +1163,10 @@ export default function App() {
             {liveState === 'idle' && 'Tap to talk'}
           </Text>
 
-          {/* Transcript */}
           {liveTranscript && (
             <Text style={styles.liveTranscript}>{liveTranscript}</Text>
           )}
 
-          {/* Main Button */}
           <TouchableOpacity onPress={toggleListening} disabled={liveState === 'connecting' || liveState === 'thinking'}>
             <Animated.View style={[
               styles.liveButton,
@@ -765,7 +1180,6 @@ export default function App() {
             </Animated.View>
           </TouchableOpacity>
 
-          {/* Recent messages */}
           <ScrollView style={styles.liveMessages}>
             {messages.slice(-6).map(msg => (
               <View key={msg.id} style={[styles.liveMsgBubble, msg.role === 'user' && styles.liveMsgUser]}>
@@ -774,7 +1188,6 @@ export default function App() {
             ))}
           </ScrollView>
 
-          {/* Exit */}
           <TouchableOpacity style={styles.exitButton} onPress={stopLiveMode}>
             <Text style={styles.exitButtonText}>Exit Voice Mode</Text>
           </TouchableOpacity>
@@ -791,7 +1204,10 @@ export default function App() {
         
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Nero</Text>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>Nero</Text>
+            <View style={[styles.syncIndicator, { backgroundColor: syncStatus === 'synced' ? COLORS.speaking : syncStatus === 'syncing' ? COLORS.live : COLORS.textDim }]} />
+          </View>
           <View style={styles.headerRight}>
             <TouchableOpacity onPress={startLiveMode} style={styles.liveIcon}>
               <Text style={styles.liveIconText}>🎙️</Text>
@@ -849,17 +1265,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
   center: { justifyContent: 'center', alignItems: 'center' },
   keyboardView: { flex: 1 },
+  loadingText: { color: COLORS.textMuted, marginTop: 12 },
   
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle: { fontSize: 20, fontWeight: '600', color: COLORS.text },
+  syncIndicator: { width: 8, height: 8, borderRadius: 4 },
   headerRight: { flexDirection: 'row', gap: 8 },
   liveIcon: { padding: 8, backgroundColor: COLORS.live + '20', borderRadius: 20 },
   liveIconText: { fontSize: 18 },
@@ -902,12 +1313,39 @@ const styles = StyleSheet.create({
   settingsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   backButton: { color: COLORS.primary, fontSize: 16 },
   settingsTitle: { fontSize: 18, fontWeight: '600', color: COLORS.text },
+  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
+  tabText: { color: COLORS.textMuted, fontSize: 14, fontWeight: '500' },
+  tabTextActive: { color: COLORS.primary },
   settingsContent: { flex: 1, padding: 20 },
-  settingsSection: { marginBottom: 32 },
-  settingsLabel: { fontSize: 14, fontWeight: '600', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  settingsHint: { fontSize: 14, color: COLORS.textDim, marginBottom: 12 },
+  settingsSection: { marginBottom: 28 },
+  settingsLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  settingsHint: { fontSize: 13, color: COLORS.textDim, marginBottom: 12 },
   settingsInput: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, color: COLORS.text, fontSize: 16 },
   memoryItem: { color: COLORS.textMuted, fontSize: 14, marginBottom: 6 },
   dangerButton: { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderRadius: 12, padding: 16, alignItems: 'center' },
   dangerButtonText: { color: '#ef4444', fontSize: 16 },
+
+  // Voice options
+  voiceOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 8 },
+  voiceOptionSelected: { borderWidth: 2, borderColor: COLORS.primary },
+  voiceOptionName: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
+  voiceOptionDesc: { color: COLORS.textDim, fontSize: 13, marginTop: 2 },
+  checkmark: { color: COLORS.primary, fontSize: 18, fontWeight: '600' },
+
+  // Sync settings
+  syncStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  syncDot: { width: 10, height: 10, borderRadius: 5 },
+  syncStatusText: { color: COLORS.textMuted, fontSize: 14 },
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 8 },
+  settingRowText: { color: COLORS.text, fontSize: 16 },
+  settingRowHint: { color: COLORS.textDim, fontSize: 13, marginTop: 2 },
+  intervalPicker: { marginTop: 16 },
+  intervalLabel: { color: COLORS.textMuted, fontSize: 14, marginBottom: 12 },
+  intervalOptions: { flexDirection: 'row', gap: 8 },
+  intervalOption: { flex: 1, backgroundColor: COLORS.surface, borderRadius: 8, padding: 12, alignItems: 'center' },
+  intervalOptionSelected: { backgroundColor: COLORS.primary },
+  intervalOptionText: { color: COLORS.textMuted, fontSize: 14, fontWeight: '500' },
+  intervalOptionTextSelected: { color: COLORS.text },
 });
