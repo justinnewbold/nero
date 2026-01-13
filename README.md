@@ -2,54 +2,59 @@
 
 **Your AI companion who knows you.**
 
-Nero is a partner who remembers your conversations, understands your ADHD brain, and helps you actually do things.
+Nero is not a productivity app. Not a to-do list. It's a partner who remembers your conversations, understands your ADHD brain, and helps you actually do the things you need to do.
 
-## 🌐 Try It
+## 🌐 Live App
 
-**Live**: [nero-app-beryl.vercel.app](https://nero-app-beryl.vercel.app)
+**[nero-app-beryl.vercel.app](https://nero-app-beryl.vercel.app)**
 
-## Features
-
-### 💬 Conversation
-- Text or voice - it's all one continuous conversation
-- Short, direct responses (no walls of text)
-- Nero remembers everything you tell it
-
-### 🎙️ Live Voice (Gemini 2.5)
-- Real-time back-and-forth conversation
-- Choose Nero's voice personality (5 options)
-- Interrupt anytime, just like talking to a person
+## What's New
 
 ### ☁️ Cloud Sync
-- Memory and conversations sync across all devices
-- Pick up where you left off on any device
-- Green dot shows sync status
+- Your conversations and memories sync across all your devices
+- Switch from phone to computer seamlessly
+- Everything persists - Nero always remembers
 
-### 📣 Proactive Check-ins
-- Nero reaches out when you've been quiet
-- Configurable: every 2, 4, 8, or 12 hours
-- Gentle nudges, never nagging
+### 🎤 Voice Input
+- Talk to Nero out loud - no typing needed
+- Nero speaks responses back to you
+- Perfect for when you're moving or can't type
 
-### 🎭 Voice Personalities
-- **Aoede** - Warm & friendly (default)
-- **Charon** - Calm & steady
-- **Fenrir** - Direct & energetic
-- **Kore** - Gentle & supportive
-- **Puck** - Playful & light
+### ⏰ Check-ins
+- Schedule gentle nudges for later
+- Nero checks in on you (when you want)
+- Not annoying push notifications - respectful check-ins
+
+## What Makes Nero Different
+
+- **One continuous conversation** - Not sessions or chats. One ongoing relationship.
+- **Real memory** - Nero remembers what you've told it, what you've committed to, what you struggle with.
+- **No features** - No gamification, no dashboards, no complexity. Just talking to someone who knows you.
+- **ADHD-native** - Built by someone with ADHD, for people with ADHD.
+
+## The Philosophy
+
+Most ADHD apps treat ADHD like a knowledge problem. They give you lists, reminders, systems.
+
+But ADHD isn't about knowing what to do. It's about doing what you know.
+
+Nero helps you bridge that gap. Not with more information, but with presence.
+
+## Tech Stack
+
+- React Native / Expo (cross-platform)
+- Claude AI (Claude Sonnet 4.5)
+- Supabase (cloud sync, persistence)
+- Web Speech API (voice input/output)
 
 ## Setup
 
 1. Open the app
-2. Go to **Settings** → Add your **Gemini API key**
-3. (Optional) Configure voice, sync, and check-in preferences
+2. (Optional) Add your Claude API key in Settings for smarter responses
+3. Start talking to Nero
 
-## Tech Stack
-
-- React Native / Expo
-- Gemini 2.5 Flash Live API
-- Supabase (cloud sync)
-- Vercel (hosting)
+Without an API key, Nero still works - just with simpler responses.
 
 ---
 
-*Built for the ADHD brain.*
+*Built with care for the ADHD community.*
