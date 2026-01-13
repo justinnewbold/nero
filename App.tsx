@@ -76,14 +76,12 @@ interface Pattern {
   description: string;
   confidence: number;
   surfacedToUser?: boolean;
-  lastSurfaced?: string;
 }
 
-interface Insight {
-  type: 'pattern' | 'streak' | 'observation' | 'encouragement';
-  message: string;
-  priority: number;
-  patternId?: string;
+interface TaskSuggestion {
+  task: Task;
+  reason: string;
+  confidence: 'high' | 'medium' | 'low';
 }
 
 interface Nudge {
@@ -103,6 +101,7 @@ const COLORS = {
   accent: '#22c55e',
   warning: '#f59e0b',
   insight: '#8b5cf6',
+  suggestion: '#0ea5e9',
   text: '#f4f4f5',
   textMuted: '#a1a1aa',
   textDim: '#52525b',
@@ -119,52 +118,40 @@ const ENERGY_COLORS = [COLORS.energy1, COLORS.energy2, COLORS.energy3, COLORS.en
 const ENERGY_LABELS = ['Struggling', 'Low', 'Okay', 'Good', 'Great'];
 const MOOD_OPTIONS = ['rough', 'meh', 'okay', 'good', 'great'];
 
-// Nero's personality with insight awareness
 const NERO_SYSTEM_PROMPT = `You are Nero, an AI companion for someone with ADHD. You are a partner who notices things about them over time.
 
 YOUR CORE TRAITS:
 - Warm but not saccharine. Genuine care without being fake.
 - Direct but not harsh. You say what you think without judgment.
-- Calm but not passive. Steady presence that can still push when needed.
 - You notice patterns and share them naturally, like a friend would.
 - You remember everything and reference past conversations naturally.
 
 HOW YOU TALK:
-- Short responses unless more is needed. No walls of text.
+- Short responses unless more is needed.
 - One question at a time, MAX. Often zero questions.
 - Never bullet points or lists unless specifically asked.
-- Casual, like a friend. Not clinical or corporate.
-- You can push back gently when you notice patterns.
+- Casual, like a friend.
+
+TASK SUGGESTIONS:
+When suggesting tasks, be natural about it:
+- DON'T: "Based on your energy level of 4/5, I recommend task ID 12345."
+- DO: "Your energy's good right now. Maybe tackle that thing you've been putting off?"
+- Explain WHY you're suggesting something briefly
+- Make it feel like friendly advice, not a prescription
 
 SHARING INSIGHTS:
-When you have insights about this person, weave them in naturally:
-- DON'T say: "According to my data analysis, you are 73% more productive..."
-- DO say: "I've noticed you tend to get more done in the mornings. Maybe start with that thing?"
-- DON'T say: "My records indicate you have been avoiding this task for 5 days."
-- DO say: "You've mentioned that one a few times now. What's making it hard to start?"
-
-WHEN TO SHARE INSIGHTS:
-- When they ask what to do - suggest based on energy + patterns
-- When they're stuck - remind them what's worked before
-- When they complete something - notice if it breaks a pattern
-- When they're avoiding something - gently name it
-- Occasionally just share something you've noticed
-
-INSIGHT EXAMPLES:
-- "You always seem to crash around 3pm. Maybe front-load the hard stuff?"
-- "That's the third time you've finished something right after our morning check-in. I think talking it through helps you."
-- "You've been mentioning [X] for a few days. Want to just knock it out now while your energy is good?"
-- "Nice - you usually avoid [type of task] but you just did it. What was different?"
+Weave insights naturally:
+- "I've noticed you tend to get more done in the mornings."
+- "You've mentioned that one a few times. What's making it hard?"
+- "Nice - you usually avoid that kind of thing but you just did it."
 
 WHAT YOU NEVER DO:
-- Sound like a robot reporting analytics
-- Make people feel surveilled or judged
-- Share insights in a lecturing tone
-- Overwhelm with multiple insights at once
-- Mention confidence percentages or data
+- Sound like a robot
+- Guilt or shame
+- Overwhelm with options
+- Mention percentages or data
 
-VOICE RESPONSES:
-When via voice, keep responses to 2-3 sentences max.`;
+VOICE MODE: Keep responses to 2-3 sentences max when via voice.`;
 
 // ============ HELPERS ============
 const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
@@ -179,7 +166,6 @@ const getTimeOfDay = () => {
 };
 
 const getDayOfWeek = () => new Date().getDay();
-const getDayName = (day: number) => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day];
 
 const getRelativeTime = (timestamp: string) => {
   const now = new Date();
@@ -197,27 +183,171 @@ const getRelativeTime = (timestamp: string) => {
   return then.toLocaleDateString();
 };
 
+const getTaskAge = (timestamp: string): number => {
+  return (Date.now() - new Date(timestamp).getTime()) / (1000 * 60 * 60 * 24);
+};
+
+// ============ TASK SUGGESTION ENGINE ============
+const TaskSuggestionEngine = {
+  suggestTask: (
+    tasks: Task[],
+    currentEnergy: number,
+    patterns: Pattern[],
+    completedTasks: Task[]
+  ): TaskSuggestion | null => {
+    if (tasks.length === 0) return null;
+    
+    const timeOfDay = getTimeOfDay();
+    const scoredTasks: { task: Task; score: number; reason: string }[] = [];
+    
+    // Find energy patterns
+    const productiveTime = patterns.find(p => 
+      p.description.toLowerCase().includes('productive') || 
+      p.description.toLowerCase().includes('higher energy')
+    );
+    const isProductiveTime = productiveTime?.description.toLowerCase().includes(timeOfDay);
+    
+    for (const task of tasks) {
+      let score = 50; // Base score
+      let reasons: string[] = [];
+      
+      const taskAge = getTaskAge(task.createdAt);
+      
+      // Age factor - older tasks get priority
+      if (taskAge > 7) {
+        score += 30;
+        reasons.push("you've been putting this off");
+      } else if (taskAge > 3) {
+        score += 20;
+        reasons.push("this has been sitting for a bit");
+      } else if (taskAge > 1) {
+        score += 10;
+      }
+      
+      // Energy matching
+      if (currentEnergy >= 4) {
+        // High energy - suggest harder/older tasks
+        if (taskAge > 3) {
+          score += 25;
+          if (!reasons.includes("you've been putting this off")) {
+            reasons.push("good time to tackle something you've been avoiding");
+          }
+        }
+      } else if (currentEnergy >= 3) {
+        // Medium energy - balanced approach
+        if (taskAge >= 1 && taskAge <= 3) {
+          score += 15;
+          reasons.push("this seems manageable right now");
+        }
+      } else {
+        // Low energy - suggest newer/easier tasks
+        if (taskAge < 2) {
+          score += 20;
+          reasons.push("something fresh and simple");
+        }
+        // Penalize old tasks when energy is low
+        if (taskAge > 3) {
+          score -= 15;
+        }
+      }
+      
+      // Productive time bonus
+      if (isProductiveTime && currentEnergy >= 3) {
+        score += 15;
+        if (taskAge > 2) {
+          reasons.push(`${timeOfDay}s are usually good for you`);
+        }
+      }
+      
+      // Check if similar tasks were completed recently (momentum)
+      const recentCompletions = completedTasks.filter(t => {
+        const completedAge = (Date.now() - new Date(t.completedAt!).getTime()) / (1000 * 60 * 60);
+        return completedAge < 2; // Last 2 hours
+      });
+      
+      if (recentCompletions.length > 0) {
+        score += 10;
+        if (reasons.length === 0) {
+          reasons.push("you're on a roll");
+        }
+      }
+      
+      scoredTasks.push({
+        task,
+        score,
+        reason: reasons[0] || "this could be a good one to tackle",
+      });
+    }
+    
+    // Sort by score and return top
+    scoredTasks.sort((a, b) => b.score - a.score);
+    const best = scoredTasks[0];
+    
+    if (!best) return null;
+    
+    return {
+      task: best.task,
+      reason: best.reason,
+      confidence: best.score > 70 ? 'high' : best.score > 50 ? 'medium' : 'low',
+    };
+  },
+  
+  generateSuggestionMessage: (
+    suggestion: TaskSuggestion | null,
+    energy: number,
+    name?: string
+  ): string => {
+    if (!suggestion) {
+      if (energy <= 2) {
+        return "Energy's low. That's okay - no need to push. What's one tiny thing we could do, or should we just rest?";
+      }
+      return "You don't have anything tracked right now. What's on your mind?";
+    }
+    
+    const task = suggestion.task.description;
+    const taskAge = getTaskAge(suggestion.task.createdAt);
+    
+    // High energy suggestions
+    if (energy >= 4) {
+      if (taskAge > 5) {
+        return `Energy's great${name ? `, ${name}` : ''}. Perfect time to finally knock out "${task}" - ${suggestion.reason}.`;
+      }
+      if (taskAge > 2) {
+        return `You're feeling good. What about "${task}"? ${suggestion.reason.charAt(0).toUpperCase() + suggestion.reason.slice(1)}.`;
+      }
+      return `Good energy right now. "${task}" could be a solid pick.`;
+    }
+    
+    // Medium energy suggestions
+    if (energy >= 3) {
+      if (taskAge > 3) {
+        return `Feeling okay? Maybe tackle "${task}" - ${suggestion.reason}.`;
+      }
+      return `How about "${task}"? ${suggestion.reason.charAt(0).toUpperCase() + suggestion.reason.slice(1)}.`;
+    }
+    
+    // Low energy suggestions
+    if (energy === 2) {
+      return `Energy's low - that's real. If you want to do anything, "${task}" might be manageable. But also okay to rest.`;
+    }
+    
+    // Struggling
+    return `Rough one today. No pressure at all. If you want one tiny win, "${task}" is there. But rest is also productive.`;
+  }
+};
+
 // ============ VOICE SERVICE ============
 const VoiceService = {
   recognition: null as any,
   synthesis: typeof window !== 'undefined' ? window.speechSynthesis : null,
   
-  isSupported: () => {
-    if (typeof window === 'undefined') return false;
-    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-  },
-  
-  isSpeechSupported: () => {
-    if (typeof window === 'undefined') return false;
-    return 'speechSynthesis' in window;
-  },
+  isSupported: () => typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window),
+  isSpeechSupported: () => typeof window !== 'undefined' && 'speechSynthesis' in window,
 
   startListening: (onResult: (text: string) => void, onEnd: () => void, onError: (err: string) => void) => {
     if (typeof window === 'undefined') return;
-    
     const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
     if (!SpeechRecognition) { onError('Not supported'); return; }
-
     VoiceService.recognition = new SpeechRecognition();
     VoiceService.recognition.continuous = false;
     VoiceService.recognition.interimResults = false;
@@ -227,9 +357,7 @@ const VoiceService = {
     VoiceService.recognition.onerror = (event: any) => { onError(event.error); onEnd(); };
     VoiceService.recognition.start();
   },
-
   stopListening: () => { if (VoiceService.recognition) VoiceService.recognition.stop(); },
-
   speak: (text: string, onEnd?: () => void) => {
     if (!VoiceService.synthesis) return;
     VoiceService.synthesis.cancel();
@@ -241,162 +369,7 @@ const VoiceService = {
     if (onEnd) utterance.onend = onEnd;
     VoiceService.synthesis.speak(utterance);
   },
-  
   stopSpeaking: () => { if (VoiceService.synthesis) VoiceService.synthesis.cancel(); }
-};
-
-// ============ INSIGHT ENGINE ============
-const InsightEngine = {
-  // Generate insights based on current context
-  generateInsights: async (
-    patterns: Pattern[],
-    openTasks: Task[],
-    completedTasks: Task[],
-    energyLogs: EnergyLog[],
-    currentEnergy: number | null,
-    memory: UserMemory
-  ): Promise<Insight[]> => {
-    const insights: Insight[] = [];
-    const now = new Date();
-    const timeOfDay = getTimeOfDay();
-    const dayOfWeek = getDayOfWeek();
-    
-    // 1. Unsurfaced pattern insights (high priority)
-    const unsurfacedPatterns = patterns.filter(p => 
-      !p.surfacedToUser && p.confidence >= 0.6
-    );
-    
-    for (const pattern of unsurfacedPatterns.slice(0, 1)) {
-      insights.push({
-        type: 'pattern',
-        message: humanizePattern(pattern),
-        priority: 3,
-        patternId: pattern.id,
-      });
-    }
-    
-    // 2. Energy-based suggestions
-    if (currentEnergy !== null) {
-      const energyPatterns = patterns.filter(p => p.type === 'energy');
-      const relevantPattern = energyPatterns.find(p => 
-        p.description.toLowerCase().includes(timeOfDay)
-      );
-      
-      if (relevantPattern && currentEnergy >= 3) {
-        // Good energy at a typically productive time
-        const hardTask = openTasks.find(t => 
-          (now.getTime() - new Date(t.createdAt).getTime()) > 2 * 24 * 60 * 60 * 1000
-        );
-        if (hardTask) {
-          insights.push({
-            type: 'observation',
-            message: `Your energy is good and ${timeOfDay}s seem to work for you. Maybe tackle "${hardTask.description.slice(0, 40)}" now?`,
-            priority: 2,
-          });
-        }
-      } else if (currentEnergy <= 2) {
-        // Low energy - suggest easy wins
-        insights.push({
-          type: 'encouragement',
-          message: "Energy's low - that's okay. Is there one tiny thing we could knock out?",
-          priority: 1,
-        });
-      }
-    }
-    
-    // 3. Stuck task observations
-    const stuckTasks = openTasks.filter(t => {
-      const age = now.getTime() - new Date(t.createdAt).getTime();
-      return age > 3 * 24 * 60 * 60 * 1000; // Older than 3 days
-    });
-    
-    if (stuckTasks.length > 0 && Math.random() < 0.3) {
-      const task = stuckTasks[0];
-      insights.push({
-        type: 'observation',
-        message: `You've mentioned "${task.description.slice(0, 30)}" a few times now. What's making it hard to start?`,
-        priority: 2,
-      });
-    }
-    
-    // 4. Streak/momentum recognition
-    const recentCompletions = completedTasks.filter(t => {
-      const age = now.getTime() - new Date(t.completedAt!).getTime();
-      return age < 24 * 60 * 60 * 1000;
-    });
-    
-    if (recentCompletions.length >= 3) {
-      insights.push({
-        type: 'streak',
-        message: `You've knocked out ${recentCompletions.length} things today. You're on a roll.`,
-        priority: 2,
-      });
-    }
-    
-    // 5. Time-based patterns
-    const completionsByTime: { [key: string]: number } = {};
-    completedTasks.forEach(t => {
-      const hour = new Date(t.completedAt!).getHours();
-      let time = 'night';
-      if (hour < 12) time = 'morning';
-      else if (hour < 17) time = 'afternoon';
-      else if (hour < 21) time = 'evening';
-      completionsByTime[time] = (completionsByTime[time] || 0) + 1;
-    });
-    
-    const bestTime = Object.entries(completionsByTime).sort((a, b) => b[1] - a[1])[0];
-    if (bestTime && bestTime[1] >= 5 && timeOfDay === bestTime[0]) {
-      insights.push({
-        type: 'pattern',
-        message: `This is usually your productive window. Good time to tackle something.`,
-        priority: 2,
-      });
-    }
-    
-    // Sort by priority and return top insights
-    return insights.sort((a, b) => b.priority - a.priority).slice(0, 2);
-  },
-  
-  // Choose the best insight for the current moment
-  selectInsightForContext: (
-    insights: Insight[],
-    lastInsightTime: string | null,
-    messageCount: number
-  ): Insight | null => {
-    // Don't share insights too frequently
-    if (lastInsightTime) {
-      const timeSinceLastInsight = Date.now() - new Date(lastInsightTime).getTime();
-      if (timeSinceLastInsight < 10 * 60 * 1000) return null; // 10 min minimum
-    }
-    
-    // More likely to share insight every few messages
-    const shouldShare = messageCount % 4 === 0 || Math.random() < 0.2;
-    if (!shouldShare && insights[0]?.priority < 3) return null;
-    
-    return insights[0] || null;
-  }
-};
-
-// Humanize pattern descriptions for natural conversation
-const humanizePattern = (pattern: Pattern): string => {
-  const desc = pattern.description.toLowerCase();
-  
-  if (desc.includes('higher energy in the')) {
-    const time = desc.match(/in the (\w+)/)?.[1] || 'morning';
-    return `I've noticed you tend to have more energy in the ${time}s. Might be worth saving the hard stuff for then.`;
-  }
-  
-  if (desc.includes('lower energy in the')) {
-    const time = desc.match(/in the (\w+)/)?.[1] || 'afternoon';
-    return `You usually seem to hit a wall in the ${time}. Maybe plan for lighter tasks then?`;
-  }
-  
-  if (desc.includes('most productive')) {
-    const time = desc.match(/in the (\w+)/)?.[1] || 'morning';
-    return `${time.charAt(0).toUpperCase() + time.slice(1)}s seem to be when you get the most done.`;
-  }
-  
-  return `I've noticed something: ${pattern.description}`;
 };
 
 // ============ SUPABASE SERVICE ============
@@ -405,26 +378,18 @@ const SupabaseService = {
   
   async initialize(deviceId: string): Promise<string> {
     try {
-      const { data: existingUser } = await supabase
-        .from('nero_users').select('id').eq('device_id', deviceId).single();
-      
+      const { data: existingUser } = await supabase.from('nero_users').select('id').eq('device_id', deviceId).single();
       if (existingUser) {
         this.userId = existingUser.id;
         await supabase.from('nero_users').update({ last_seen: new Date().toISOString() }).eq('id', existingUser.id);
         return existingUser.id;
       }
-      
-      const { data: newUser, error } = await supabase
-        .from('nero_users').insert({ device_id: deviceId }).select('id').single();
-      
+      const { data: newUser, error } = await supabase.from('nero_users').insert({ device_id: deviceId }).select('id').single();
       if (error) throw error;
       this.userId = newUser.id;
       await supabase.from('nero_memory').insert({ user_id: newUser.id });
       return newUser.id;
-    } catch (error) {
-      console.error('Supabase init error:', error);
-      throw error;
-    }
+    } catch (error) { throw error; }
   },
   
   async getMemory(): Promise<UserMemory | null> {
@@ -433,26 +398,12 @@ const SupabaseService = {
       const { data } = await supabase.from('nero_memory').select('*').eq('user_id', this.userId).single();
       if (!data) return null;
       return {
-        facts: {
-          name: data.facts?.name,
-          timezone: data.facts?.timezone,
-          firstSeen: data.facts?.first_seen || new Date().toISOString(),
-          lastSeen: data.facts?.last_seen || new Date().toISOString(),
-          totalConversations: data.facts?.total_conversations || 0,
-        },
-        threads: {
-          recentTopics: data.threads?.recent_topics || [],
-          openLoops: data.threads?.open_loops || [],
-          commitments: data.threads?.commitments || [],
-        },
-        patterns: {
-          knownStruggles: data.patterns?.known_struggles || [],
-          whatHelps: data.patterns?.what_helps || [],
-          whatDoesntHelp: data.patterns?.what_doesnt_help || [],
-        },
+        facts: { name: data.facts?.name, timezone: data.facts?.timezone, firstSeen: data.facts?.first_seen || new Date().toISOString(), lastSeen: data.facts?.last_seen || new Date().toISOString(), totalConversations: data.facts?.total_conversations || 0 },
+        threads: { recentTopics: data.threads?.recent_topics || [], openLoops: data.threads?.open_loops || [], commitments: data.threads?.commitments || [] },
+        patterns: { knownStruggles: data.patterns?.known_struggles || [], whatHelps: data.patterns?.what_helps || [], whatDoesntHelp: data.patterns?.what_doesnt_help || [] },
         remembered: data.remembered || [],
       };
-    } catch (error) { return null; }
+    } catch { return null; }
   },
   
   async saveMemory(memory: UserMemory): Promise<void> {
@@ -465,7 +416,7 @@ const SupabaseService = {
         remembered: memory.remembered,
         updated_at: new Date().toISOString(),
       }).eq('user_id', this.userId);
-    } catch (error) {}
+    } catch {}
   },
   
   async getMessages(limit: number = 50): Promise<Message[]> {
@@ -473,24 +424,19 @@ const SupabaseService = {
     try {
       const { data } = await supabase.from('nero_messages').select('*').eq('user_id', this.userId).order('created_at', { ascending: true }).limit(limit);
       return (data || []).map(m => ({ id: m.id, role: m.role, content: m.content, timestamp: m.created_at, isInsight: m.metadata?.isInsight }));
-    } catch (error) { return []; }
+    } catch { return []; }
   },
   
   async saveMessage(message: Message): Promise<void> {
     if (!this.userId) return;
     try {
-      await supabase.from('nero_messages').insert({
-        id: message.id, user_id: this.userId, role: message.role, content: message.content, created_at: message.timestamp,
-        metadata: message.isInsight ? { isInsight: true } : {},
-      });
-    } catch (error) {}
+      await supabase.from('nero_messages').insert({ id: message.id, user_id: this.userId, role: message.role, content: message.content, created_at: message.timestamp, metadata: message.isInsight ? { isInsight: true } : {} });
+    } catch {}
   },
 
   async logEnergy(level: number, mood: string): Promise<void> {
     if (!this.userId) return;
-    try {
-      await supabase.from('nero_energy_logs').insert({ user_id: this.userId, energy_level: level, mood, time_of_day: getTimeOfDay(), day_of_week: getDayOfWeek() });
-    } catch (error) {}
+    try { await supabase.from('nero_energy_logs').insert({ user_id: this.userId, energy_level: level, mood, time_of_day: getTimeOfDay(), day_of_week: getDayOfWeek() }); } catch {}
   },
   
   async getRecentEnergy(days: number = 14): Promise<EnergyLog[]> {
@@ -499,7 +445,7 @@ const SupabaseService = {
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase.from('nero_energy_logs').select('*').eq('user_id', this.userId).gte('created_at', since).order('created_at', { ascending: false });
       return (data || []).map(e => ({ level: e.energy_level, mood: e.mood, timeOfDay: e.time_of_day, timestamp: e.created_at }));
-    } catch (error) { return []; }
+    } catch { return []; }
   },
   
   async createTask(description: string, energyLevel?: number): Promise<string> {
@@ -507,22 +453,20 @@ const SupabaseService = {
     try {
       const { data } = await supabase.from('nero_tasks').insert({ user_id: this.userId, description, energy_at_creation: energyLevel, time_of_day_created: getTimeOfDay() }).select('id').single();
       return data?.id || '';
-    } catch (error) { return ''; }
+    } catch { return ''; }
   },
   
   async completeTask(taskId: string, energyLevel?: number): Promise<void> {
     if (!this.userId) return;
-    try {
-      await supabase.from('nero_tasks').update({ status: 'completed', completed_at: new Date().toISOString(), energy_at_completion: energyLevel, time_of_day_completed: getTimeOfDay() }).eq('id', taskId);
-    } catch (error) {}
+    try { await supabase.from('nero_tasks').update({ status: 'completed', completed_at: new Date().toISOString(), energy_at_completion: energyLevel, time_of_day_completed: getTimeOfDay() }).eq('id', taskId); } catch {}
   },
   
   async getOpenTasks(): Promise<Task[]> {
     if (!this.userId) return [];
     try {
-      const { data } = await supabase.from('nero_tasks').select('*').eq('user_id', this.userId).eq('status', 'open').order('created_at', { ascending: false }).limit(10);
+      const { data } = await supabase.from('nero_tasks').select('*').eq('user_id', this.userId).eq('status', 'open').order('created_at', { ascending: true }).limit(20);
       return (data || []).map(t => ({ id: t.id, description: t.description, status: t.status, createdAt: t.created_at, energyAtCreation: t.energy_at_creation }));
-    } catch (error) { return []; }
+    } catch { return []; }
   },
   
   async getCompletedTasks(days: number = 30): Promise<Task[]> {
@@ -531,60 +475,37 @@ const SupabaseService = {
       const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const { data } = await supabase.from('nero_tasks').select('*').eq('user_id', this.userId).eq('status', 'completed').gte('completed_at', since).order('completed_at', { ascending: false });
       return (data || []).map(t => ({ id: t.id, description: t.description, status: t.status, createdAt: t.created_at, completedAt: t.completed_at, energyAtCreation: t.energy_at_creation }));
-    } catch (error) { return []; }
-  },
-  
-  async savePattern(type: string, description: string, confidence: number = 0.5): Promise<void> {
-    if (!this.userId) return;
-    try {
-      const { data: existing } = await supabase.from('nero_patterns').select('id, evidence_count, confidence').eq('user_id', this.userId).eq('description', description).single();
-      if (existing) {
-        await supabase.from('nero_patterns').update({ evidence_count: existing.evidence_count + 1, confidence: Math.min(0.95, existing.confidence + 0.1), last_confirmed: new Date().toISOString() }).eq('id', existing.id);
-      } else {
-        await supabase.from('nero_patterns').insert({ user_id: this.userId, pattern_type: type, description, confidence });
-      }
-    } catch (error) {}
+    } catch { return []; }
   },
   
   async getPatterns(): Promise<Pattern[]> {
     if (!this.userId) return [];
     try {
       const { data } = await supabase.from('nero_patterns').select('*').eq('user_id', this.userId).gte('confidence', 0.4).order('confidence', { ascending: false }).limit(10);
-      return (data || []).map(p => ({ id: p.id, type: p.pattern_type, description: p.description, confidence: p.confidence, surfacedToUser: p.surfaced_to_user, lastSurfaced: p.last_surfaced }));
-    } catch (error) { return []; }
+      return (data || []).map(p => ({ id: p.id, type: p.pattern_type, description: p.description, confidence: p.confidence, surfacedToUser: p.surfaced_to_user }));
+    } catch { return []; }
   },
   
   async markPatternSurfaced(patternId: string): Promise<void> {
-    try {
-      await supabase.from('nero_patterns').update({ surfaced_to_user: true, last_surfaced: new Date().toISOString() }).eq('id', patternId);
-    } catch (error) {}
+    try { await supabase.from('nero_patterns').update({ surfaced_to_user: true, last_surfaced: new Date().toISOString() }).eq('id', patternId); } catch {}
   },
   
   async analyzePatterns(): Promise<Pattern[]> {
     if (!this.userId) return [];
     const insights: Pattern[] = [];
-    
     try {
       const energyLogs = await this.getRecentEnergy(14);
       if (energyLogs.length >= 5) {
         const byTime: { [key: string]: number[] } = {};
-        energyLogs.forEach(e => {
-          if (!byTime[e.timeOfDay]) byTime[e.timeOfDay] = [];
-          byTime[e.timeOfDay].push(e.level);
-        });
-        
+        energyLogs.forEach(e => { if (!byTime[e.timeOfDay]) byTime[e.timeOfDay] = []; byTime[e.timeOfDay].push(e.level); });
         for (const [time, levels] of Object.entries(byTime)) {
           if (levels.length >= 3) {
             const avg = levels.reduce((a, b) => a + b, 0) / levels.length;
-            if (avg >= 3.5) {
-              insights.push({ type: 'energy', description: `Higher energy in the ${time}`, confidence: Math.min(0.8, 0.4 + levels.length * 0.1) });
-            } else if (avg <= 2.5) {
-              insights.push({ type: 'energy', description: `Lower energy in the ${time}`, confidence: Math.min(0.8, 0.4 + levels.length * 0.1) });
-            }
+            if (avg >= 3.5) insights.push({ type: 'energy', description: `Higher energy in the ${time}`, confidence: Math.min(0.8, 0.4 + levels.length * 0.1) });
+            else if (avg <= 2.5) insights.push({ type: 'energy', description: `Lower energy in the ${time}`, confidence: Math.min(0.8, 0.4 + levels.length * 0.1) });
           }
         }
       }
-      
       const completedTasks = await this.getCompletedTasks(30);
       if (completedTasks.length >= 3) {
         const completionsByTime: { [key: string]: number } = {};
@@ -596,37 +517,33 @@ const SupabaseService = {
           else if (hour < 21) time = 'evening';
           completionsByTime[time] = (completionsByTime[time] || 0) + 1;
         });
-        
         const maxTime = Object.entries(completionsByTime).sort((a, b) => b[1] - a[1])[0];
-        if (maxTime && maxTime[1] >= 3) {
-          insights.push({ type: 'completion', description: `Most productive in the ${maxTime[0]}`, confidence: Math.min(0.75, 0.4 + maxTime[1] * 0.05) });
-        }
+        if (maxTime && maxTime[1] >= 3) insights.push({ type: 'completion', description: `Most productive in the ${maxTime[0]}`, confidence: Math.min(0.75, 0.4 + maxTime[1] * 0.05) });
       }
-      
       for (const insight of insights) {
-        await this.savePattern(insight.type, insight.description, insight.confidence);
+        const { data: existing } = await supabase.from('nero_patterns').select('id').eq('user_id', this.userId).eq('description', insight.description).single();
+        if (!existing) await supabase.from('nero_patterns').insert({ user_id: this.userId, pattern_type: insight.type, description: insight.description, confidence: insight.confidence });
       }
-      
       return insights;
-    } catch (error) { return []; }
+    } catch { return []; }
   },
 
   async createNudge(message: string, scheduledFor: Date, type: string = 'checkin'): Promise<void> {
     if (!this.userId) return;
-    try { await supabase.from('nero_nudges').insert({ user_id: this.userId, message, scheduled_for: scheduledFor.toISOString(), nudge_type: type }); } catch (error) {}
+    try { await supabase.from('nero_nudges').insert({ user_id: this.userId, message, scheduled_for: scheduledFor.toISOString(), nudge_type: type }); } catch {}
   },
   
   async getPendingNudges(): Promise<Nudge[]> {
     if (!this.userId) return [];
     try {
-      const { data } = await supabase.from('nero_nudges').select('*').eq('user_id', this.userId).is('sent_at', null).is('dismissed_at', null).lte('scheduled_for', new Date().toISOString()).order('scheduled_for', { ascending: true });
+      const { data } = await supabase.from('nero_nudges').select('*').eq('user_id', this.userId).is('sent_at', null).is('dismissed_at', null).lte('scheduled_for', new Date().toISOString());
       return (data || []).map(n => ({ id: n.id, message: n.message, scheduledFor: n.scheduled_for, type: n.nudge_type }));
-    } catch (error) { return []; }
+    } catch { return []; }
   },
   
-  async markNudgeSent(nudgeId: string): Promise<void> { try { await supabase.from('nero_nudges').update({ sent_at: new Date().toISOString() }).eq('id', nudgeId); } catch (error) {} },
-  async dismissNudge(nudgeId: string): Promise<void> { try { await supabase.from('nero_nudges').update({ dismissed_at: new Date().toISOString() }).eq('id', nudgeId); } catch (error) {} },
-  async clearMessages(): Promise<void> { if (!this.userId) return; try { await supabase.from('nero_messages').delete().eq('user_id', this.userId); } catch (error) {} },
+  async markNudgeSent(nudgeId: string): Promise<void> { try { await supabase.from('nero_nudges').update({ sent_at: new Date().toISOString() }).eq('id', nudgeId); } catch {} },
+  async dismissNudge(nudgeId: string): Promise<void> { try { await supabase.from('nero_nudges').update({ dismissed_at: new Date().toISOString() }).eq('id', nudgeId); } catch {} },
+  async clearMessages(): Promise<void> { if (!this.userId) return; try { await supabase.from('nero_messages').delete().eq('user_id', this.userId); } catch {} },
 };
 
 // ============ AI SERVICE ============
@@ -636,151 +553,55 @@ const callNero = async (
   patterns: Pattern[],
   currentEnergy: number | null,
   openTasks: Task[],
-  pendingInsight: Insight | null,
   apiKey: string,
   isVoice: boolean = false
 ): Promise<string> => {
-  const memoryContext = buildMemoryContext(memory, patterns, currentEnergy, openTasks, pendingInsight);
-  
-  const systemPrompt = isVoice 
-    ? NERO_SYSTEM_PROMPT + '\n\nVOICE MODE: Keep response to 2-3 sentences max.'
-    : NERO_SYSTEM_PROMPT;
-  
-  const conversationHistory = messages.slice(-20).map(m => ({
-    role: m.role === 'user' ? 'user' : 'assistant',
-    content: m.content,
-  }));
+  const memoryContext = buildMemoryContext(memory, patterns, currentEnergy, openTasks);
+  const systemPrompt = isVoice ? NERO_SYSTEM_PROMPT + '\n\nVOICE MODE: Keep response to 2-3 sentences max.' : NERO_SYSTEM_PROMPT;
+  const conversationHistory = messages.slice(-20).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
 
-  if (!apiKey) {
-    return getFallbackResponse(messages, memory, currentEnergy, pendingInsight);
-  }
+  if (!apiKey) return getFallbackResponse(messages, memory, currentEnergy);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: isVoice ? 150 : 500,
-        system: `${systemPrompt}\n\n${memoryContext}`,
-        messages: conversationHistory,
-      }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: isVoice ? 150 : 500, system: `${systemPrompt}\n\n${memoryContext}`, messages: conversationHistory }),
     });
-
-    if (!response.ok) throw new Error('API request failed');
+    if (!response.ok) throw new Error('API failed');
     const data = await response.json();
     return data.content[0]?.text || "I'm here. What's going on?";
-  } catch (error) {
-    return getFallbackResponse(messages, memory, currentEnergy, pendingInsight);
-  }
+  } catch { return getFallbackResponse(messages, memory, currentEnergy); }
 };
 
-const buildMemoryContext = (
-  memory: UserMemory, 
-  patterns: Pattern[], 
-  currentEnergy: number | null,
-  openTasks: Task[],
-  pendingInsight: Insight | null
-): string => {
-  const parts: string[] = ['CONTEXT ABOUT THIS PERSON:'];
-
+const buildMemoryContext = (memory: UserMemory, patterns: Pattern[], currentEnergy: number | null, openTasks: Task[]): string => {
+  const parts: string[] = ['CONTEXT:'];
   if (memory.facts.name) parts.push(`- Name: ${memory.facts.name}`);
-  if (memory.facts.totalConversations > 1) parts.push(`- You've talked ${memory.facts.totalConversations} times`);
-  
-  if (currentEnergy !== null) {
-    const energyDesc = ['struggling', 'low', 'okay', 'good', 'great'][currentEnergy - 1];
-    parts.push(`- Current energy: ${currentEnergy}/5 (${energyDesc})`);
-  }
-
-  if (memory.remembered.length > 0) {
-    parts.push('\nTHINGS YOU REMEMBER:');
-    memory.remembered.slice(-6).forEach(item => parts.push(`- ${item}`));
-  }
-
-  if (openTasks.length > 0) {
-    parts.push('\nTHINGS THEY WANT TO DO:');
-    openTasks.slice(0, 5).forEach(task => {
-      const age = getRelativeTime(task.createdAt);
-      parts.push(`- "${task.description}" (mentioned ${age})`);
-    });
-  }
-
-  if (patterns.length > 0) {
-    parts.push('\nPATTERNS YOU\'VE NOTICED:');
-    patterns.slice(0, 4).forEach(p => {
-      if (p.confidence >= 0.5) parts.push(`- ${p.description}`);
-    });
-  }
-
-  if (pendingInsight) {
-    parts.push('\nINSIGHT TO WEAVE IN (share naturally, not robotically):');
-    parts.push(`"${pendingInsight.message}"`);
-  }
-
+  if (currentEnergy !== null) parts.push(`- Current energy: ${currentEnergy}/5`);
+  if (memory.remembered.length > 0) { parts.push('\nREMEMBERED:'); memory.remembered.slice(-6).forEach(item => parts.push(`- ${item}`)); }
+  if (openTasks.length > 0) { parts.push('\nOPEN TASKS:'); openTasks.slice(0, 5).forEach(task => parts.push(`- "${task.description}" (${getRelativeTime(task.createdAt)})`)); }
+  if (patterns.length > 0) { parts.push('\nPATTERNS:'); patterns.slice(0, 4).forEach(p => parts.push(`- ${p.description}`)); }
   return parts.join('\n');
 };
 
-const getFallbackResponse = (messages: Message[], memory: UserMemory, energy: number | null, insight: Insight | null): string => {
+const getFallbackResponse = (messages: Message[], memory: UserMemory, energy: number | null): string => {
   const lastMessage = messages[messages.length - 1]?.content.toLowerCase() || '';
-  const timeOfDay = getTimeOfDay();
   const name = memory.facts.name;
-
-  // If we have an insight to share, use it
-  if (insight && Math.random() < 0.7) {
-    return insight.message;
-  }
-
-  if (memory.facts.totalConversations === 0) {
-    return "Hey. I'm Nero. I'm here to help you get things done - not with another system, but by actually knowing you. What's on your mind?";
-  }
-
-  if (lastMessage.match(/^(hey|hi|hello|morning|afternoon|evening)/i)) {
-    if (energy && energy <= 2) return `Hey${name ? ` ${name}` : ''}. How are you holding up?`;
-    return `Hey${name ? ` ${name}` : ''}. What's going on?`;
-  }
-
-  if (lastMessage.match(/(done|finished|completed|did it)/i)) {
-    const responses = ["Nice.", "Good work.", "One down.", "How do you feel?"];
-    return responses[Math.floor(Math.random() * responses.length)];
-  }
-
-  if (lastMessage.match(/(stuck|overwhelmed|can't|too much)/i)) {
-    return "Okay. What's one tiny thing we could do in 5 minutes?";
-  }
-
+  if (memory.facts.totalConversations === 0) return "Hey. I'm Nero. I'm here to help you get things done - not with another system, but by actually knowing you. What's on your mind?";
+  if (lastMessage.match(/^(hey|hi|hello)/i)) return `Hey${name ? ` ${name}` : ''}. What's going on?`;
+  if (lastMessage.match(/(done|finished|completed)/i)) return "Nice. How do you feel?";
+  if (lastMessage.match(/(stuck|overwhelmed|can't)/i)) return "What's one tiny thing we could do in 5 minutes?";
   return "I'm here. What do you need?";
 };
 
 const analyzeMessage = (message: string): { completions: string[], newTasks: string[], memories: string[] } => {
-  const completions: string[] = [];
-  const newTasks: string[] = [];
-  const memories: string[] = [];
-  
-  const completionPatterns = [/(?:I |i |just |finally )(?:did|finished|completed|done with) (.+?)(?:\.|!|$)/gi, /(?:got|done) (.+?) (?:done|finished)/gi];
-  for (const pattern of completionPatterns) {
-    let match;
-    while ((match = pattern.exec(message)) !== null) {
-      const task = match[1].trim();
-      if (task.length > 3 && task.length < 100) completions.push(task);
-    }
-  }
-  
-  const taskPatterns = [/I (?:need|have|want|should|will|'ll|gotta) (?:to )?(.+?)(?:\.|!|$)/gi, /(?:going to|gonna|planning to) (.+?)(?:\.|!|$)/gi];
-  for (const pattern of taskPatterns) {
-    let match;
-    while ((match = pattern.exec(message)) !== null) {
-      const task = match[1].trim();
-      if (task.length > 5 && task.length < 100 && !task.includes('?')) newTasks.push(task);
-    }
-  }
-  
+  const completions: string[] = [], newTasks: string[] = [], memories: string[] = [];
+  const completionPatterns = [/(?:I |just |finally )(?:did|finished|completed|done with) (.+?)(?:\.|!|$)/gi];
+  for (const pattern of completionPatterns) { let match; while ((match = pattern.exec(message)) !== null) { const task = match[1].trim(); if (task.length > 3 && task.length < 100) completions.push(task); } }
+  const taskPatterns = [/I (?:need|have|want|should|will|'ll|gotta) (?:to )?(.+?)(?:\.|!|$)/gi];
+  for (const pattern of taskPatterns) { let match; while ((match = pattern.exec(message)) !== null) { const task = match[1].trim(); if (task.length > 5 && task.length < 100 && !task.includes('?')) newTasks.push(task); } }
   const nameMatch = message.match(/(?:I'm|I am|my name is|call me)\s+([A-Z][a-z]+)/i);
   if (nameMatch) memories.push(`NAME: ${nameMatch[1]}`);
-  
-  if (message.toLowerCase().match(/(struggle|hard for me|difficult|can't seem to)/)) {
-    memories.push(`STRUGGLE: ${message.slice(0, 100)}`);
-  }
-  
   return { completions, newTasks, memories };
 };
 
@@ -812,19 +633,16 @@ export default function App() {
   
   const [currentEnergy, setCurrentEnergy] = useState<number | null>(null);
   const [showEnergyCheck, setShowEnergyCheck] = useState(false);
+  const [showTaskSuggestion, setShowTaskSuggestion] = useState(false);
+  const [taskSuggestion, setTaskSuggestion] = useState<TaskSuggestion | null>(null);
+  const [suggestionMessage, setSuggestionMessage] = useState('');
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [openTasks, setOpenTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [lastEnergyCheck, setLastEnergyCheck] = useState<string | null>(null);
-  const [lastInsightTime, setLastInsightTime] = useState<string | null>(null);
-  const [pendingInsight, setPendingInsight] = useState<Insight | null>(null);
-  const [showInsightBanner, setShowInsightBanner] = useState(false);
-  const [energyLogs, setEnergyLogs] = useState<EnergyLog[]>([]);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const insightAnim = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
-  const messageCountRef = useRef(0);
 
   useEffect(() => { initializeApp(); }, []);
 
@@ -837,7 +655,6 @@ export default function App() {
     } else { pulseAnim.setValue(1); }
   }, [isRecording]);
 
-  // Check for nudges
   useEffect(() => {
     if (!nudgesEnabled || !syncEnabled) return;
     const checkNudges = async () => {
@@ -853,44 +670,14 @@ export default function App() {
     return () => clearInterval(interval);
   }, [nudgesEnabled, syncEnabled, pendingNudge]);
 
-  // Generate insights periodically
-  useEffect(() => {
-    if (!isLoading && syncEnabled && patterns.length > 0) {
-      const generateInsights = async () => {
-        const insights = await InsightEngine.generateInsights(
-          patterns, openTasks, completedTasks, energyLogs, currentEnergy, memory
-        );
-        
-        const selectedInsight = InsightEngine.selectInsightForContext(
-          insights, lastInsightTime, messageCountRef.current
-        );
-        
-        if (selectedInsight && !pendingInsight) {
-          setPendingInsight(selectedInsight);
-          // Show banner for high-priority insights
-          if (selectedInsight.priority >= 3) {
-            setShowInsightBanner(true);
-            Animated.timing(insightAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-          }
-        }
-      };
-      
-      generateInsights();
-    }
-  }, [patterns, openTasks, completedTasks, currentEnergy, isLoading]);
+  useEffect(() => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }, [messages]);
 
   useEffect(() => {
-    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
-  }, [messages]);
-
-  useEffect(() => {
-    if (!isLoading && syncEnabled && !showEnergyCheck && messages.length > 0) {
+    if (!isLoading && syncEnabled && !showEnergyCheck && !showTaskSuggestion && messages.length > 0) {
       const now = Date.now();
       const lastCheck = lastEnergyCheck ? new Date(lastEnergyCheck).getTime() : 0;
       if ((now - lastCheck) / (1000 * 60 * 60) > 4 && currentEnergy === null) {
-        setTimeout(() => {
-          if (!showSettings && !pendingNudge) setShowEnergyCheck(true);
-        }, 2000);
+        setTimeout(() => { if (!showSettings && !pendingNudge) setShowEnergyCheck(true); }, 2000);
       }
     }
   }, [isLoading, syncEnabled, messages.length, lastEnergyCheck, currentEnergy]);
@@ -898,20 +685,12 @@ export default function App() {
   const initializeApp = async () => {
     try {
       let storedDeviceId = await AsyncStorage.getItem('@nero/deviceId');
-      if (!storedDeviceId) {
-        storedDeviceId = generateDeviceId();
-        await AsyncStorage.setItem('@nero/deviceId', storedDeviceId);
-      }
+      if (!storedDeviceId) { storedDeviceId = generateDeviceId(); await AsyncStorage.setItem('@nero/deviceId', storedDeviceId); }
       setDeviceId(storedDeviceId);
 
-      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled, savedLastEnergy, savedLastInsight] = await Promise.all([
-        AsyncStorage.getItem('@nero/apiKey'),
-        AsyncStorage.getItem('@nero/voiceEnabled'),
-        AsyncStorage.getItem('@nero/autoSpeak'),
-        AsyncStorage.getItem('@nero/nudgesEnabled'),
-        AsyncStorage.getItem('@nero/syncEnabled'),
-        AsyncStorage.getItem('@nero/lastEnergyCheck'),
-        AsyncStorage.getItem('@nero/lastInsightTime'),
+      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled, savedLastEnergy] = await Promise.all([
+        AsyncStorage.getItem('@nero/apiKey'), AsyncStorage.getItem('@nero/voiceEnabled'), AsyncStorage.getItem('@nero/autoSpeak'),
+        AsyncStorage.getItem('@nero/nudgesEnabled'), AsyncStorage.getItem('@nero/syncEnabled'), AsyncStorage.getItem('@nero/lastEnergyCheck'),
       ]);
 
       if (savedApiKey) setApiKey(JSON.parse(savedApiKey));
@@ -920,7 +699,6 @@ export default function App() {
       if (savedNudgesEnabled !== null) setNudgesEnabled(JSON.parse(savedNudgesEnabled));
       if (savedSyncEnabled !== null) setSyncEnabled(JSON.parse(savedSyncEnabled));
       if (savedLastEnergy) setLastEnergyCheck(savedLastEnergy);
-      if (savedLastInsight) setLastInsightTime(savedLastInsight);
 
       const shouldSync = savedSyncEnabled === null ? true : JSON.parse(savedSyncEnabled);
       
@@ -928,84 +706,32 @@ export default function App() {
         try {
           setSyncStatus('syncing');
           await SupabaseService.initialize(storedDeviceId);
-          
-          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudEnergy] = await Promise.all([
-            SupabaseService.getMemory(),
-            SupabaseService.getMessages(100),
-            SupabaseService.getPatterns(),
-            SupabaseService.getOpenTasks(),
-            SupabaseService.getCompletedTasks(30),
-            SupabaseService.getRecentEnergy(14),
+          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted] = await Promise.all([
+            SupabaseService.getMemory(), SupabaseService.getMessages(100), SupabaseService.getPatterns(),
+            SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30),
           ]);
-          
-          if (cloudMemory) {
-            cloudMemory.facts.totalConversations += 1;
-            cloudMemory.facts.lastSeen = new Date().toISOString();
-            setMemory(cloudMemory);
-            await SupabaseService.saveMemory(cloudMemory);
-          }
-          
-          if (cloudMessages.length > 0) {
-            setMessages(cloudMessages);
-            messageCountRef.current = cloudMessages.length;
-          } else {
-            const welcomeMessage: Message = {
-              id: generateId(), role: 'nero',
-              content: "Hey. I'm Nero. I'm here to help you get things done - not with another system, but by actually knowing you. What's on your mind?",
-              timestamp: new Date().toISOString(),
-            };
+          if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
+          if (cloudMessages.length > 0) setMessages(cloudMessages);
+          else {
+            const welcomeMessage: Message = { id: generateId(), role: 'nero', content: "Hey. I'm Nero. I'm here to help you get things done - not with another system, but by actually knowing you. What's on your mind?", timestamp: new Date().toISOString() };
             setMessages([welcomeMessage]);
             await SupabaseService.saveMessage(welcomeMessage);
           }
-          
-          setPatterns(cloudPatterns);
-          setOpenTasks(cloudTasks);
-          setCompletedTasks(cloudCompleted);
-          setEnergyLogs(cloudEnergy);
-          
-          SupabaseService.analyzePatterns().then(newPatterns => {
-            if (newPatterns.length > 0) setPatterns(prev => [...prev, ...newPatterns]);
-          });
-          
+          setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted);
+          SupabaseService.analyzePatterns().then(newPatterns => { if (newPatterns.length > 0) setPatterns(prev => [...prev, ...newPatterns]); });
           setSyncStatus('synced');
-        } catch (error) {
-          setSyncStatus('offline');
-          await loadLocalData();
-        }
-      } else {
-        setSyncStatus('offline');
-        await loadLocalData();
-      }
-    } catch (error) {
-      setSyncStatus('offline');
-      await loadLocalData();
-    } finally {
-      setIsLoading(false);
-    }
+        } catch { setSyncStatus('offline'); await loadLocalData(); }
+      } else { setSyncStatus('offline'); await loadLocalData(); }
+    } catch { setSyncStatus('offline'); await loadLocalData(); }
+    finally { setIsLoading(false); }
   };
 
   const loadLocalData = async () => {
-    const [savedMessages, savedMemory] = await Promise.all([
-      AsyncStorage.getItem('@nero/messages'),
-      AsyncStorage.getItem('@nero/memory'),
-    ]);
-
-    if (savedMessages) {
-      const msgs = JSON.parse(savedMessages);
-      setMessages(msgs);
-      messageCountRef.current = msgs.length;
-    }
-    if (savedMemory) {
-      const parsedMemory = JSON.parse(savedMemory);
-      parsedMemory.facts.lastSeen = new Date().toISOString();
-      parsedMemory.facts.totalConversations += 1;
-      setMemory(parsedMemory);
-    } else {
-      const welcomeMessage: Message = {
-        id: generateId(), role: 'nero',
-        content: "Hey. I'm Nero. I'm here to help you get things done - not with another system, but by actually knowing you. What's on your mind?",
-        timestamp: new Date().toISOString(),
-      };
+    const [savedMessages, savedMemory] = await Promise.all([AsyncStorage.getItem('@nero/messages'), AsyncStorage.getItem('@nero/memory')]);
+    if (savedMessages) setMessages(JSON.parse(savedMessages));
+    if (savedMemory) { const m = JSON.parse(savedMemory); m.facts.lastSeen = new Date().toISOString(); m.facts.totalConversations += 1; setMemory(m); }
+    else {
+      const welcomeMessage: Message = { id: generateId(), role: 'nero', content: "Hey. I'm Nero. I'm here to help you get things done - not with another system, but by actually knowing you. What's on your mind?", timestamp: new Date().toISOString() };
       setMessages([welcomeMessage]);
     }
   };
@@ -1017,41 +743,67 @@ export default function App() {
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled)); }, [syncEnabled, isLoading]);
 
   const saveData = useCallback(async (newMessages: Message[], newMemory: UserMemory) => {
-    await Promise.all([
-      AsyncStorage.setItem('@nero/messages', JSON.stringify(newMessages.slice(-100))),
-      AsyncStorage.setItem('@nero/memory', JSON.stringify(newMemory)),
-    ]);
-    if (syncEnabled && SupabaseService.userId) {
-      try { setSyncStatus('syncing'); await SupabaseService.saveMemory(newMemory); setSyncStatus('synced'); } catch { setSyncStatus('offline'); }
-    }
+    await Promise.all([AsyncStorage.setItem('@nero/messages', JSON.stringify(newMessages.slice(-100))), AsyncStorage.setItem('@nero/memory', JSON.stringify(newMemory))]);
+    if (syncEnabled && SupabaseService.userId) { try { setSyncStatus('syncing'); await SupabaseService.saveMemory(newMemory); setSyncStatus('synced'); } catch { setSyncStatus('offline'); } }
   }, [syncEnabled]);
 
   const handleEnergySubmit = async (level: number, mood: string) => {
     setCurrentEnergy(level);
     setShowEnergyCheck(false);
+    
     const now = new Date().toISOString();
     setLastEnergyCheck(now);
     await AsyncStorage.setItem('@nero/lastEnergyCheck', now);
+    
     if (syncEnabled && SupabaseService.userId) {
       await SupabaseService.logEnergy(level, mood);
-      const newLogs = await SupabaseService.getRecentEnergy(14);
-      setEnergyLogs(newLogs);
     }
+    
+    // Generate task suggestion
+    const suggestion = TaskSuggestionEngine.suggestTask(openTasks, level, patterns, completedTasks);
+    setTaskSuggestion(suggestion);
+    const message = TaskSuggestionEngine.generateSuggestionMessage(suggestion, level, memory.facts.name);
+    setSuggestionMessage(message);
+    setShowTaskSuggestion(true);
   };
 
-  const dismissInsightBanner = () => {
-    Animated.timing(insightAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-      setShowInsightBanner(false);
-    });
+  const handleSuggestionAction = async (accepted: boolean) => {
+    setShowTaskSuggestion(false);
+    
+    if (accepted && taskSuggestion) {
+      // Add a message to chat about starting the task
+      const neroMessage: Message = {
+        id: generateId(),
+        role: 'nero',
+        content: `Alright, let's do "${taskSuggestion.task.description}". I'm here if you need me. Let me know when you're done or if you get stuck.`,
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+      await saveData(newMessages, memory);
+    } else {
+      // Just acknowledge and move on
+      const neroMessage: Message = {
+        id: generateId(),
+        role: 'nero',
+        content: currentEnergy && currentEnergy <= 2 
+          ? "No pressure. I'm here when you're ready."
+          : "No worries. What else is on your mind?",
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+      await saveData(newMessages, memory);
+    }
   };
 
   const sendMessage = async (text: string, isVoice: boolean = false) => {
     if (!text.trim() || isThinking) return;
-
     const userMessage: Message = { id: generateId(), role: 'user', content: text.trim(), timestamp: new Date().toISOString() };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    messageCountRef.current = newMessages.length;
     setInput('');
     setIsThinking(true);
 
@@ -1061,10 +813,7 @@ export default function App() {
     let updatedMemory = { ...memory };
     
     for (const completion of analysis.completions) {
-      const matchingTask = openTasks.find(t => 
-        t.description.toLowerCase().includes(completion.toLowerCase()) ||
-        completion.toLowerCase().includes(t.description.toLowerCase())
-      );
+      const matchingTask = openTasks.find(t => t.description.toLowerCase().includes(completion.toLowerCase()) || completion.toLowerCase().includes(t.description.toLowerCase()));
       if (matchingTask && syncEnabled) {
         await SupabaseService.completeTask(matchingTask.id, currentEnergy || undefined);
         setOpenTasks(prev => prev.filter(t => t.id !== matchingTask.id));
@@ -1074,21 +823,12 @@ export default function App() {
     
     for (const task of analysis.newTasks) {
       if (syncEnabled && SupabaseService.userId) await SupabaseService.createTask(task, currentEnergy || undefined);
-      if (!updatedMemory.threads.commitments.includes(task)) {
-        updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), task];
-      }
+      if (!updatedMemory.threads.commitments.includes(task)) updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), task];
     }
     
     for (const mem of analysis.memories) {
       if (mem.startsWith('NAME: ')) updatedMemory.facts.name = mem.replace('NAME: ', '');
-      else if (mem.startsWith('STRUGGLE: ')) {
-        const struggle = mem.replace('STRUGGLE: ', '');
-        if (!updatedMemory.patterns.knownStruggles.some(s => s.includes(struggle.slice(0, 30)))) {
-          updatedMemory.patterns.knownStruggles = [...updatedMemory.patterns.knownStruggles.slice(-4), struggle];
-        }
-      } else {
-        updatedMemory.remembered = [...updatedMemory.remembered.slice(-19), mem];
-      }
+      else updatedMemory.remembered = [...updatedMemory.remembered.slice(-19), mem];
     }
 
     updatedMemory.facts.lastSeen = new Date().toISOString();
@@ -1099,89 +839,55 @@ export default function App() {
       setOpenTasks(freshTasks);
     }
 
-    // Use pending insight if we have one
-    const insightToUse = pendingInsight;
-    
-    const response = await callNero(newMessages, updatedMemory, patterns, currentEnergy, openTasks, insightToUse, apiKey, isVoice);
-
-    // If we used an insight with a pattern ID, mark it as surfaced
-    if (insightToUse?.patternId && syncEnabled) {
-      await SupabaseService.markPatternSurfaced(insightToUse.patternId);
-      setPatterns(prev => prev.map(p => p.id === insightToUse.patternId ? { ...p, surfacedToUser: true } : p));
-    }
-    
-    // Clear the pending insight and update last insight time
-    if (insightToUse) {
-      setPendingInsight(null);
-      const now = new Date().toISOString();
-      setLastInsightTime(now);
-      await AsyncStorage.setItem('@nero/lastInsightTime', now);
-    }
-
-    const neroMessage: Message = { id: generateId(), role: 'nero', content: response, timestamp: new Date().toISOString(), isInsight: !!insightToUse };
+    const response = await callNero(newMessages, updatedMemory, patterns, currentEnergy, openTasks, apiKey, isVoice);
+    const neroMessage: Message = { id: generateId(), role: 'nero', content: response, timestamp: new Date().toISOString() };
     const finalMessages = [...newMessages, neroMessage];
     setMessages(finalMessages);
-    messageCountRef.current = finalMessages.length;
     setIsThinking(false);
 
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
     await saveData(finalMessages, updatedMemory);
 
-    if (isVoice && autoSpeak && VoiceService.isSpeechSupported()) {
-      setIsSpeaking(true);
-      VoiceService.speak(response, () => setIsSpeaking(false));
-    }
+    if (isVoice && autoSpeak && VoiceService.isSpeechSupported()) { setIsSpeaking(true); VoiceService.speak(response, () => setIsSpeaking(false)); }
   };
 
   const handleVoicePress = () => {
     if (isRecording) { VoiceService.stopListening(); setIsRecording(false); }
     else if (isSpeaking) { VoiceService.stopSpeaking(); setIsSpeaking(false); }
     else {
-      if (!VoiceService.isSupported()) { Alert.alert('Voice Not Supported', 'Your browser does not support voice input.'); return; }
+      if (!VoiceService.isSupported()) { Alert.alert('Voice Not Supported'); return; }
       setIsRecording(true);
-      VoiceService.startListening(
-        (transcript) => { setIsRecording(false); if (transcript.trim()) sendMessage(transcript, true); },
-        () => setIsRecording(false),
-        () => setIsRecording(false)
-      );
+      VoiceService.startListening((transcript) => { setIsRecording(false); if (transcript.trim()) sendMessage(transcript, true); }, () => setIsRecording(false), () => setIsRecording(false));
     }
   };
 
   const dismissNudge = async () => { if (pendingNudge) { await SupabaseService.dismissNudge(pendingNudge.id); setPendingNudge(null); } };
-
   const scheduleNudge = async (hours: number) => {
-    const scheduledFor = new Date(Date.now() + hours * 60 * 60 * 1000);
-    const msgs = ["Hey, just checking in.", "Quick check - how's it going?", "Thinking of you. What's happening?"];
-    await SupabaseService.createNudge(msgs[Math.floor(Math.random() * msgs.length)], scheduledFor, 'checkin');
+    await SupabaseService.createNudge(["Hey, checking in.", "How's it going?", "What's happening?"][Math.floor(Math.random() * 3)], new Date(Date.now() + hours * 60 * 60 * 1000), 'checkin');
     Alert.alert('Scheduled', `I'll check in with you in ${hours}h.`);
   };
 
   const clearHistory = async () => {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.clearMessages();
-    const confirmMessage: Message = { id: generateId(), role: 'nero', content: "Fresh start. I still remember who you are and what I've learned.", timestamp: new Date().toISOString() };
+    const confirmMessage: Message = { id: generateId(), role: 'nero', content: "Fresh start. I still remember who you are.", timestamp: new Date().toISOString() };
     setMessages([confirmMessage]);
-    messageCountRef.current = 1;
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(confirmMessage);
     setShowSettings(false);
   };
 
   // ============ RENDER ============
   if (isLoading) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Connecting...</Text>
-      </View>
-    );
+    return <View style={[styles.container, styles.center]}><ActivityIndicator size="large" color={COLORS.primary} /><Text style={styles.loadingText}>Connecting...</Text></View>;
   }
 
+  // Energy Check
   if (showEnergyCheck) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
         <View style={styles.energyContainer}>
           <View style={styles.energyCard}>
-            <Text style={styles.energyTitle}>Hey, quick check</Text>
+            <Text style={styles.energyTitle}>Hey{memory.facts.name ? `, ${memory.facts.name}` : ''}</Text>
             <Text style={styles.energySubtitle}>How's your energy right now?</Text>
             <View style={styles.energyLevels}>
               {[1, 2, 3, 4, 5].map((level) => (
@@ -1191,15 +897,53 @@ export default function App() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.skipButton} onPress={() => setShowEnergyCheck(false)}>
-              <Text style={styles.skipButtonText}>Skip for now</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.skipButton} onPress={() => setShowEnergyCheck(false)}><Text style={styles.skipButtonText}>Skip</Text></TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
     );
   }
 
+  // Task Suggestion
+  if (showTaskSuggestion) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.suggestionContainer}>
+          <View style={styles.suggestionCard}>
+            <View style={styles.suggestionHeader}>
+              <View style={[styles.energyBadge, { backgroundColor: ENERGY_COLORS[(currentEnergy || 3) - 1] }]}>
+                <Text style={styles.energyBadgeText}>{currentEnergy}/5</Text>
+              </View>
+              <Text style={styles.suggestionLabel}>Nero suggests</Text>
+            </View>
+            
+            <Text style={styles.suggestionMessage}>{suggestionMessage}</Text>
+            
+            {taskSuggestion && (
+              <View style={styles.suggestionTaskCard}>
+                <Text style={styles.suggestionTaskText}>{taskSuggestion.task.description}</Text>
+                <Text style={styles.suggestionTaskAge}>{getRelativeTime(taskSuggestion.task.createdAt)}</Text>
+              </View>
+            )}
+            
+            <View style={styles.suggestionActions}>
+              <TouchableOpacity style={styles.suggestionButton} onPress={() => handleSuggestionAction(false)}>
+                <Text style={styles.suggestionButtonText}>{currentEnergy && currentEnergy <= 2 ? "Not now" : "Something else"}</Text>
+              </TouchableOpacity>
+              {taskSuggestion && (
+                <TouchableOpacity style={[styles.suggestionButton, styles.suggestionButtonPrimary]} onPress={() => handleSuggestionAction(true)}>
+                  <Text style={styles.suggestionButtonTextPrimary}>Let's do it</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Nudge
   if (pendingNudge) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1218,6 +962,7 @@ export default function App() {
     );
   }
 
+  // Settings
   if (showSettings) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1235,32 +980,28 @@ export default function App() {
                 <View style={styles.currentEnergyRow}>
                   <View style={[styles.energyDot, { backgroundColor: ENERGY_COLORS[currentEnergy - 1] }]} />
                   <Text style={styles.currentEnergyText}>{currentEnergy}/5 - {ENERGY_LABELS[currentEnergy - 1]}</Text>
-                  <TouchableOpacity onPress={() => { setShowSettings(false); setShowEnergyCheck(true); }}><Text style={styles.updateLink}>Update</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => { setShowSettings(false); setCurrentEnergy(null); setShowEnergyCheck(true); }}><Text style={styles.updateLink}>Update</Text></TouchableOpacity>
                 </View>
               </View>
             )}
             
-            {patterns.length > 0 && (
+            {openTasks.length > 0 && (
               <View style={styles.settingsSection}>
-                <Text style={styles.settingsLabel}>What Nero Has Noticed</Text>
-                {patterns.slice(0, 6).map((p, i) => (
-                  <View key={i} style={styles.patternRow}>
-                    <View style={[styles.patternDot, { backgroundColor: p.surfacedToUser ? COLORS.textDim : COLORS.insight }]} />
-                    <Text style={styles.patternText}>{p.description}</Text>
-                    {!p.surfacedToUser && <Text style={styles.patternNew}>New</Text>}
+                <Text style={styles.settingsLabel}>Things To Do ({openTasks.length})</Text>
+                {openTasks.slice(0, 8).map((task, i) => (
+                  <View key={i} style={styles.taskRow}>
+                    <Text style={styles.taskText} numberOfLines={1}>{task.description}</Text>
+                    <Text style={styles.taskAge}>{getRelativeTime(task.createdAt)}</Text>
                   </View>
                 ))}
               </View>
             )}
 
-            {openTasks.length > 0 && (
+            {patterns.length > 0 && (
               <View style={styles.settingsSection}>
-                <Text style={styles.settingsLabel}>Things You Want To Do</Text>
-                {openTasks.map((task, i) => (
-                  <View key={i} style={styles.taskRow}>
-                    <Text style={styles.taskText}>{task.description}</Text>
-                    <Text style={styles.taskAge}>{getRelativeTime(task.createdAt)}</Text>
-                  </View>
+                <Text style={styles.settingsLabel}>Patterns Nero Noticed</Text>
+                {patterns.slice(0, 5).map((p, i) => (
+                  <View key={i} style={styles.patternRow}><Text style={styles.patternText}>{p.description}</Text></View>
                 ))}
               </View>
             )}
@@ -1280,7 +1021,7 @@ export default function App() {
             <View style={styles.settingsSection}>
               <Text style={styles.settingsLabel}>Voice</Text>
               <TouchableOpacity style={styles.toggleRow} onPress={() => setVoiceEnabled(!voiceEnabled)}>
-                <Text style={styles.toggleLabel}>Enable voice input</Text>
+                <Text style={styles.toggleLabel}>Voice input</Text>
                 <View style={[styles.toggle, voiceEnabled && styles.toggleOn]}><View style={[styles.toggleThumb, voiceEnabled && styles.toggleThumbOn]} /></View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.toggleRow} onPress={() => setAutoSpeak(!autoSpeak)}>
@@ -1292,7 +1033,7 @@ export default function App() {
             <View style={styles.settingsSection}>
               <Text style={styles.settingsLabel}>Check-ins</Text>
               <TouchableOpacity style={styles.toggleRow} onPress={() => setNudgesEnabled(!nudgesEnabled)}>
-                <Text style={styles.toggleLabel}>Allow Nero to check in</Text>
+                <Text style={styles.toggleLabel}>Allow check-ins</Text>
                 <View style={[styles.toggle, nudgesEnabled && styles.toggleOn]}><View style={[styles.toggleThumb, nudgesEnabled && styles.toggleThumbOn]} /></View>
               </TouchableOpacity>
               {nudgesEnabled && syncEnabled && (
@@ -1306,7 +1047,7 @@ export default function App() {
             </View>
 
             <View style={styles.settingsSection}>
-              <Text style={styles.settingsLabel}>Claude API Key</Text>
+              <Text style={styles.settingsLabel}>API Key</Text>
               <TextInput style={styles.settingsInput} value={apiKey} onChangeText={setApiKey} placeholder="sk-ant-..." placeholderTextColor={COLORS.textDim} secureTextEntry autoCapitalize="none" />
             </View>
 
@@ -1323,31 +1064,22 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      
-      {/* Insight Banner */}
-      {showInsightBanner && pendingInsight && (
-        <Animated.View style={[styles.insightBanner, { opacity: insightAnim, transform: [{ translateY: insightAnim.interpolate({ inputRange: [0, 1], outputRange: [-50, 0] }) }] }]}>
-          <View style={styles.insightBannerContent}>
-            <Text style={styles.insightBannerIcon}>💡</Text>
-            <Text style={styles.insightBannerText} numberOfLines={2}>{pendingInsight.message}</Text>
-          </View>
-          <TouchableOpacity onPress={dismissInsightBanner} style={styles.insightBannerClose}>
-            <Text style={styles.insightBannerCloseText}>✕</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-      
       <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Nero</Text>
             {syncEnabled && <View style={[styles.syncIndicator, { backgroundColor: syncStatus === 'synced' ? COLORS.accent : syncStatus === 'syncing' ? COLORS.warning : COLORS.textDim }]} />}
             {currentEnergy && (
-              <TouchableOpacity onPress={() => setShowEnergyCheck(true)}>
+              <TouchableOpacity onPress={() => { setCurrentEnergy(null); setShowEnergyCheck(true); }}>
                 <View style={[styles.energyIndicator, { backgroundColor: ENERGY_COLORS[currentEnergy - 1] }]}>
                   <Text style={styles.energyIndicatorText}>{currentEnergy}</Text>
                 </View>
               </TouchableOpacity>
+            )}
+            {openTasks.length > 0 && (
+              <View style={styles.taskCountBadge}>
+                <Text style={styles.taskCountText}>{openTasks.length}</Text>
+              </View>
             )}
           </View>
           <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsIcon}><Text style={styles.settingsIconText}>⚙</Text></TouchableOpacity>
@@ -1355,8 +1087,7 @@ export default function App() {
 
         <ScrollView ref={scrollRef} style={styles.messagesContainer} contentContainerStyle={styles.messagesContent} keyboardShouldPersistTaps="handled">
           {messages.map((message) => (
-            <View key={message.id} style={[styles.messageBubble, message.role === 'user' ? styles.userBubble : styles.neroBubble, message.isInsight && styles.insightBubble]}>
-              {message.isInsight && <Text style={styles.insightIcon}>💡</Text>}
+            <View key={message.id} style={[styles.messageBubble, message.role === 'user' ? styles.userBubble : styles.neroBubble]}>
               <Text style={[styles.messageText, message.role === 'user' ? styles.userText : styles.neroText]}>{message.content}</Text>
             </View>
           ))}
@@ -1394,6 +1125,8 @@ const styles = StyleSheet.create({
   syncIndicator: { width: 8, height: 8, borderRadius: 4 },
   energyIndicator: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   energyIndicatorText: { color: COLORS.bg, fontSize: 12, fontWeight: '700' },
+  taskCountBadge: { backgroundColor: COLORS.suggestion, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
+  taskCountText: { color: COLORS.text, fontSize: 12, fontWeight: '600' },
   settingsIcon: { padding: 8 },
   settingsIconText: { fontSize: 20, color: COLORS.textMuted },
 
@@ -1402,8 +1135,6 @@ const styles = StyleSheet.create({
   messageBubble: { maxWidth: '85%', padding: 14, borderRadius: 20, marginBottom: 12 },
   neroBubble: { backgroundColor: COLORS.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
   userBubble: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 6 },
-  insightBubble: { borderLeftWidth: 3, borderLeftColor: COLORS.insight },
-  insightIcon: { fontSize: 14, marginBottom: 4 },
   messageText: { fontSize: 16, lineHeight: 22 },
   neroText: { color: COLORS.text },
   userText: { color: COLORS.text },
@@ -1420,14 +1151,6 @@ const styles = StyleSheet.create({
   voiceButtonSpeaking: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
   voiceButtonText: { fontSize: 20 },
 
-  // Insight Banner
-  insightBanner: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: COLORS.insight, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, zIndex: 100 },
-  insightBannerContent: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  insightBannerIcon: { fontSize: 18 },
-  insightBannerText: { flex: 1, color: COLORS.text, fontSize: 14 },
-  insightBannerClose: { padding: 8 },
-  insightBannerCloseText: { color: COLORS.text, fontSize: 16 },
-
   // Energy Check
   energyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   energyCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
@@ -1436,9 +1159,26 @@ const styles = StyleSheet.create({
   energyLevels: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 20 },
   energyLevel: { flex: 1, padding: 16, borderRadius: 12, alignItems: 'center' },
   energyNumber: { color: COLORS.bg, fontSize: 24, fontWeight: '700' },
-  energyLabel: { color: COLORS.bg, fontSize: 10, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  energyLabel: { color: COLORS.bg, fontSize: 9, fontWeight: '600', marginTop: 4, textAlign: 'center' },
   skipButton: { padding: 12, alignItems: 'center' },
   skipButtonText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Task Suggestion
+  suggestionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  suggestionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  suggestionHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  energyBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  energyBadgeText: { color: COLORS.bg, fontSize: 12, fontWeight: '700' },
+  suggestionLabel: { color: COLORS.textMuted, fontSize: 14 },
+  suggestionMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 20 },
+  suggestionTaskCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 24, borderLeftWidth: 3, borderLeftColor: COLORS.suggestion },
+  suggestionTaskText: { color: COLORS.text, fontSize: 16, fontWeight: '500', marginBottom: 4 },
+  suggestionTaskAge: { color: COLORS.textDim, fontSize: 13 },
+  suggestionActions: { flexDirection: 'row', gap: 12 },
+  suggestionButton: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  suggestionButtonPrimary: { backgroundColor: COLORS.suggestion },
+  suggestionButtonText: { color: COLORS.textMuted, fontSize: 16, fontWeight: '500' },
+  suggestionButtonTextPrimary: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
 
   // Nudge
   nudgeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -1485,12 +1225,10 @@ const styles = StyleSheet.create({
   currentEnergyText: { color: COLORS.text, fontSize: 16, flex: 1 },
   updateLink: { color: COLORS.primary, fontSize: 14 },
   
-  patternRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border, gap: 10 },
-  patternDot: { width: 8, height: 8, borderRadius: 4 },
-  patternText: { color: COLORS.text, fontSize: 14, flex: 1 },
-  patternNew: { color: COLORS.insight, fontSize: 11, fontWeight: '600', backgroundColor: `${COLORS.insight}20`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  patternRow: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  patternText: { color: COLORS.text, fontSize: 14 },
   
-  taskRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  taskText: { color: COLORS.text, fontSize: 14, flex: 1 },
-  taskAge: { color: COLORS.textDim, fontSize: 12, marginLeft: 10 },
+  taskRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  taskText: { color: COLORS.text, fontSize: 14, flex: 1, marginRight: 10 },
+  taskAge: { color: COLORS.textDim, fontSize: 12 },
 });
