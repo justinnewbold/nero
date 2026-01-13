@@ -14,6 +14,7 @@ import {
   Vibration,
   Alert,
   PanResponder,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -70,6 +71,30 @@ interface BodyDoubleSession {
   checkInCount: number;
 }
 
+interface FocusSession {
+  id: string;
+  taskId?: string;
+  taskDescription?: string;
+  startedAt: string;
+  endedAt: string;
+  durationMs: number;
+  completed: boolean;
+  checkInCount: number;
+  timeOfDay: string;
+  dayOfWeek: number;
+}
+
+interface FocusStats {
+  totalSessions: number;
+  totalFocusTime: number;
+  completionRate: number;
+  avgSessionLength: number;
+  bestTimeOfDay: string | null;
+  bestDayOfWeek: number | null;
+  longestSession: number;
+  currentStreak: number;
+}
+
 interface Nudge {
   id: string;
   message: string;
@@ -99,11 +124,13 @@ const COLORS = {
   energy5: '#22c55e',
   complete: '#22c55e',
   delete: '#ef4444',
+  quickAdd: '#ec4899',
 };
 
 const ENERGY_COLORS = [COLORS.energy1, COLORS.energy2, COLORS.energy3, COLORS.energy4, COLORS.energy5];
 const ENERGY_LABELS = ['Struggling', 'Low', 'Okay', 'Good', 'Great'];
 const MOOD_OPTIONS = ['rough', 'meh', 'okay', 'good', 'great'];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const BODY_DOUBLE_CHECK_INS = [
   "Still with you. How's it going?",
@@ -158,7 +185,107 @@ const formatDuration = (ms: number) => {
   return `${mins}m`;
 };
 
+const formatDurationShort = (ms: number) => {
+  const mins = Math.floor(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h${mins % 60 > 0 ? ` ${mins % 60}m` : ''}`;
+};
+
 const getTaskAge = (timestamp: string): number => (Date.now() - new Date(timestamp).getTime()) / (1000 * 60 * 60 * 24);
+
+// ============ FOCUS ANALYTICS ENGINE ============
+const FocusAnalytics = {
+  calculateStats: (sessions: FocusSession[]): FocusStats => {
+    if (sessions.length === 0) {
+      return { totalSessions: 0, totalFocusTime: 0, completionRate: 0, avgSessionLength: 0, bestTimeOfDay: null, bestDayOfWeek: null, longestSession: 0, currentStreak: 0 };
+    }
+
+    const totalSessions = sessions.length;
+    const totalFocusTime = sessions.reduce((sum, s) => sum + s.durationMs, 0);
+    const completedSessions = sessions.filter(s => s.completed).length;
+    const completionRate = Math.round((completedSessions / totalSessions) * 100);
+    const avgSessionLength = totalFocusTime / totalSessions;
+    const longestSession = Math.max(...sessions.map(s => s.durationMs));
+
+    // Best time of day
+    const byTimeOfDay: { [key: string]: { count: number; completed: number; duration: number } } = {};
+    sessions.forEach(s => {
+      if (!byTimeOfDay[s.timeOfDay]) byTimeOfDay[s.timeOfDay] = { count: 0, completed: 0, duration: 0 };
+      byTimeOfDay[s.timeOfDay].count++;
+      if (s.completed) byTimeOfDay[s.timeOfDay].completed++;
+      byTimeOfDay[s.timeOfDay].duration += s.durationMs;
+    });
+    
+    let bestTimeOfDay: string | null = null;
+    let bestTimeScore = 0;
+    for (const [time, data] of Object.entries(byTimeOfDay)) {
+      const score = (data.completed / data.count) * 0.5 + (data.duration / (data.count * 1800000)) * 0.5;
+      if (score > bestTimeScore) { bestTimeScore = score; bestTimeOfDay = time; }
+    }
+
+    // Best day of week
+    const byDayOfWeek: { [key: number]: { count: number; completed: number; duration: number } } = {};
+    sessions.forEach(s => {
+      if (!byDayOfWeek[s.dayOfWeek]) byDayOfWeek[s.dayOfWeek] = { count: 0, completed: 0, duration: 0 };
+      byDayOfWeek[s.dayOfWeek].count++;
+      if (s.completed) byDayOfWeek[s.dayOfWeek].completed++;
+      byDayOfWeek[s.dayOfWeek].duration += s.durationMs;
+    });
+
+    let bestDayOfWeek: number | null = null;
+    let bestDayScore = 0;
+    for (const [day, data] of Object.entries(byDayOfWeek)) {
+      const score = (data.completed / data.count) * 0.5 + (data.duration / (data.count * 1800000)) * 0.5;
+      if (score > bestDayScore) { bestDayScore = score; bestDayOfWeek = parseInt(day); }
+    }
+
+    // Current streak (consecutive days with completed sessions)
+    const sortedByDate = [...sessions].filter(s => s.completed).sort((a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime());
+    let currentStreak = 0;
+    if (sortedByDate.length > 0) {
+      const today = new Date().setHours(0, 0, 0, 0);
+      let checkDate = today;
+      for (const session of sortedByDate) {
+        const sessionDate = new Date(session.endedAt).setHours(0, 0, 0, 0);
+        if (sessionDate === checkDate || sessionDate === checkDate - 86400000) {
+          if (sessionDate !== checkDate) checkDate = sessionDate;
+          currentStreak++;
+        } else break;
+      }
+    }
+
+    return { totalSessions, totalFocusTime, completionRate, avgSessionLength, bestTimeOfDay, bestDayOfWeek, longestSession, currentStreak };
+  },
+
+  generateInsight: (stats: FocusStats, name?: string): string | null => {
+    if (stats.totalSessions < 3) return null;
+    
+    const insights: string[] = [];
+    
+    if (stats.bestTimeOfDay && stats.totalSessions >= 5) {
+      insights.push(`You focus best in the ${stats.bestTimeOfDay}.`);
+    }
+    
+    if (stats.bestDayOfWeek !== null && stats.totalSessions >= 7) {
+      insights.push(`${DAY_NAMES[stats.bestDayOfWeek]}s are your most productive day.`);
+    }
+    
+    if (stats.completionRate >= 70) {
+      insights.push(`${stats.completionRate}% completion rate. You finish what you start.`);
+    }
+    
+    if (stats.currentStreak >= 3) {
+      insights.push(`${stats.currentStreak} day streak. Momentum building.`);
+    }
+    
+    if (stats.longestSession > 3600000) {
+      insights.push(`Your longest focus was ${formatDurationShort(stats.longestSession)}. Deep work is possible.`);
+    }
+
+    return insights.length > 0 ? insights[Math.floor(Math.random() * insights.length)] : null;
+  }
+};
 
 // ============ TASK SUGGESTION ENGINE ============
 const TaskSuggestionEngine = {
@@ -360,6 +487,41 @@ const SupabaseService = {
     }
   },
 
+  async saveFocusSession(session: FocusSession): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_focus_sessions').insert({
+      id: session.id,
+      user_id: this.userId,
+      task_id: session.taskId,
+      task_description: session.taskDescription,
+      started_at: session.startedAt,
+      ended_at: session.endedAt,
+      duration_ms: session.durationMs,
+      completed: session.completed,
+      check_in_count: session.checkInCount,
+      time_of_day: session.timeOfDay,
+      day_of_week: session.dayOfWeek,
+    });
+  },
+
+  async getFocusSessions(days: number = 30): Promise<FocusSession[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_focus_sessions').select('*').eq('user_id', this.userId).gte('started_at', since).order('started_at', { ascending: false });
+    return (data || []).map(s => ({
+      id: s.id,
+      taskId: s.task_id,
+      taskDescription: s.task_description,
+      startedAt: s.started_at,
+      endedAt: s.ended_at,
+      durationMs: s.duration_ms,
+      completed: s.completed,
+      checkInCount: s.check_in_count,
+      timeOfDay: s.time_of_day,
+      dayOfWeek: s.day_of_week,
+    }));
+  },
+
   async getPendingNudges(): Promise<Nudge[]> {
     if (!this.userId) return [];
     const { data } = await supabase.from('nero_nudges').select('*').eq('user_id', this.userId).is('sent_at', null).is('dismissed_at', null).lte('scheduled_for', new Date().toISOString());
@@ -455,25 +617,92 @@ const SwipeableTask = ({ task, onComplete, onDelete }: { task: Task; onComplete:
 
   return (
     <View style={styles.swipeContainer}>
-      <View style={[styles.swipeBackground, styles.swipeBackgroundLeft]}>
-        <Text style={styles.swipeText}>✓ Done</Text>
-      </View>
-      <View style={[styles.swipeBackground, styles.swipeBackgroundRight]}>
-        <Text style={styles.swipeText}>✕ Remove</Text>
-      </View>
-      <Animated.View
-        style={[
-          styles.taskItem,
-          { transform: [{ translateX }] },
-          swiping === 'right' && styles.taskItemSwiping,
-          swiping === 'left' && styles.taskItemSwipingDelete,
-        ]}
-        {...panResponder.panHandlers}
-      >
+      <View style={[styles.swipeBackground, styles.swipeBackgroundLeft]}><Text style={styles.swipeText}>✓ Done</Text></View>
+      <View style={[styles.swipeBackground, styles.swipeBackgroundRight]}><Text style={styles.swipeText}>✕ Remove</Text></View>
+      <Animated.View style={[styles.taskItem, { transform: [{ translateX }] }, swiping === 'right' && styles.taskItemSwiping, swiping === 'left' && styles.taskItemSwipingDelete]} {...panResponder.panHandlers}>
         <Text style={styles.taskItemText} numberOfLines={2}>{task.description}</Text>
         <Text style={styles.taskItemAge}>{getRelativeTime(task.createdAt)}</Text>
       </Animated.View>
     </View>
+  );
+};
+
+// ============ QUICK ADD MODAL ============
+const QuickAddModal = ({ visible, onClose, onAdd, voiceEnabled }: { visible: boolean; onClose: () => void; onAdd: (task: string) => void; voiceEnabled: boolean }) => {
+  const [text, setText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const inputRef = useRef<TextInput>(null);
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setText('');
+      Animated.parallel([
+        Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start(() => inputRef.current?.focus());
+    } else {
+      scaleAnim.setValue(0.9);
+      opacityAnim.setValue(0);
+    }
+  }, [visible]);
+
+  const handleAdd = () => {
+    if (text.trim()) {
+      onAdd(text.trim());
+      setText('');
+      onClose();
+    }
+  };
+
+  const handleVoice = () => {
+    if (isRecording) {
+      VoiceService.stopListening();
+      setIsRecording(false);
+    } else {
+      setIsRecording(true);
+      VoiceService.startListening(
+        (transcript) => { setText(transcript); setIsRecording(false); },
+        () => setIsRecording(false),
+        () => setIsRecording(false)
+      );
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[styles.quickAddOverlay, { opacity: opacityAnim }]}>
+        <TouchableOpacity style={styles.quickAddBackdrop} onPress={onClose} activeOpacity={1} />
+        <Animated.View style={[styles.quickAddCard, { transform: [{ scale: scaleAnim }] }]}>
+          <Text style={styles.quickAddTitle}>Quick Add Task</Text>
+          <View style={styles.quickAddInputRow}>
+            <TextInput
+              ref={inputRef}
+              style={styles.quickAddInput}
+              value={text}
+              onChangeText={setText}
+              placeholder="What do you need to do?"
+              placeholderTextColor={COLORS.textDim}
+              multiline
+              maxLength={200}
+              onSubmitEditing={handleAdd}
+            />
+            {voiceEnabled && VoiceService.isSupported() && (
+              <TouchableOpacity style={[styles.quickAddVoice, isRecording && styles.quickAddVoiceActive]} onPress={handleVoice}>
+                <Text style={styles.quickAddVoiceText}>{isRecording ? '●' : '🎤'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.quickAddActions}>
+            <TouchableOpacity style={styles.quickAddCancel} onPress={onClose}><Text style={styles.quickAddCancelText}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.quickAddSubmit, !text.trim() && styles.quickAddSubmitDisabled]} onPress={handleAdd} disabled={!text.trim()}>
+              <Text style={styles.quickAddSubmitText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
   );
 };
 
@@ -519,11 +748,30 @@ export default function App() {
   const [showBodyDoubleCheckIn, setShowBodyDoubleCheckIn] = useState(false);
   const bodyDoubleTimer = useRef<NodeJS.Timeout | null>(null);
   
+  // Focus Analytics
+  const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
+  const [focusStats, setFocusStats] = useState<FocusStats | null>(null);
+  const [showFocusStats, setShowFocusStats] = useState(false);
+  
+  // Quick Add
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
+  const fabAnim = useRef(new Animated.Value(1)).current;
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => { initializeApp(); }, []);
+
+  // FAB pulse animation
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(fabAnim, { toValue: 1.05, duration: 1500, useNativeDriver: true }),
+        Animated.timing(fabAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
   // Breathing animation for body double mode
   useEffect(() => {
@@ -544,14 +792,12 @@ export default function App() {
     if (bodyDoubleMode && bodyDoubleSession) {
       bodyDoubleTimer.current = setInterval(() => {
         const timeSinceLastCheckIn = Date.now() - new Date(bodyDoubleSession.lastCheckIn).getTime();
-        // Check in every 8-15 minutes (random to feel natural)
         const checkInInterval = (8 + Math.random() * 7) * 60 * 1000;
         if (timeSinceLastCheckIn > checkInInterval) {
           setShowBodyDoubleCheckIn(true);
           if (Platform.OS !== 'web') Vibration.vibrate(100);
         }
       }, 60000);
-      
       return () => { if (bodyDoubleTimer.current) clearInterval(bodyDoubleTimer.current); };
     }
   }, [bodyDoubleMode, bodyDoubleSession]);
@@ -591,6 +837,14 @@ export default function App() {
     }
   }, [isLoading, syncEnabled, messages.length, lastEnergyCheck, currentEnergy, bodyDoubleMode]);
 
+  // Calculate focus stats when sessions change
+  useEffect(() => {
+    if (focusSessions.length > 0) {
+      const stats = FocusAnalytics.calculateStats(focusSessions);
+      setFocusStats(stats);
+    }
+  }, [focusSessions]);
+
   const initializeApp = async () => {
     try {
       let storedDeviceId = await AsyncStorage.getItem('@nero/deviceId');
@@ -615,9 +869,9 @@ export default function App() {
         try {
           setSyncStatus('syncing');
           await SupabaseService.initialize(storedDeviceId);
-          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted] = await Promise.all([
+          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions] = await Promise.all([
             SupabaseService.getMemory(), SupabaseService.getMessages(100), SupabaseService.getPatterns(),
-            SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30),
+            SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30), SupabaseService.getFocusSessions(30),
           ]);
           if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
           if (cloudMessages.length > 0) setMessages(cloudMessages);
@@ -626,7 +880,7 @@ export default function App() {
             setMessages([welcome]);
             await SupabaseService.saveMessage(welcome);
           }
-          setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted);
+          setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted); setFocusSessions(cloudSessions);
           SupabaseService.analyzePatterns();
           setSyncStatus('synced');
         } catch { setSyncStatus('offline'); await loadLocalData(); }
@@ -674,7 +928,6 @@ export default function App() {
     setShowTaskSuggestion(false);
     
     if (accepted && taskSuggestion) {
-      // Start body double mode with this task
       startBodyDoubleMode(taskSuggestion.task);
     } else {
       const neroMessage: Message = {
@@ -743,14 +996,33 @@ export default function App() {
   };
 
   const endBodyDoubleMode = async (completed: boolean = false) => {
+    const endTime = new Date().toISOString();
+    const duration = bodyDoubleSession ? Date.now() - new Date(bodyDoubleSession.startedAt).getTime() : 0;
+
+    // Save focus session
+    if (bodyDoubleSession && syncEnabled && SupabaseService.userId) {
+      const focusSession: FocusSession = {
+        id: generateId(),
+        taskId: bodyDoubleSession.taskId,
+        taskDescription: bodyDoubleSession.taskDescription,
+        startedAt: bodyDoubleSession.startedAt,
+        endedAt: endTime,
+        durationMs: duration,
+        completed,
+        checkInCount: bodyDoubleSession.checkInCount,
+        timeOfDay: getTimeOfDay(),
+        dayOfWeek: getDayOfWeek(),
+      };
+      await SupabaseService.saveFocusSession(focusSession);
+      setFocusSessions(prev => [focusSession, ...prev]);
+    }
+
     if (bodyDoubleSession?.taskId && completed && syncEnabled) {
       await SupabaseService.completeTask(bodyDoubleSession.taskId, currentEnergy || undefined);
       setOpenTasks(prev => prev.filter(t => t.id !== bodyDoubleSession.taskId));
     }
 
-    const duration = bodyDoubleSession ? Date.now() - new Date(bodyDoubleSession.startedAt).getTime() : 0;
     const durationStr = formatDuration(duration);
-
     const content = completed
       ? `Done! ${durationStr} of focused work. ${bodyDoubleSession?.taskDescription ? `"${bodyDoubleSession.taskDescription}" - checked off.` : ''} How do you feel?`
       : `${durationStr} together. Good session. Rest up.`;
@@ -765,11 +1037,24 @@ export default function App() {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
     await saveData(newMessages, memory);
     
-    // Refresh tasks
     if (syncEnabled && SupabaseService.userId) {
       const freshTasks = await SupabaseService.getOpenTasks();
       setOpenTasks(freshTasks);
     }
+  };
+
+  const handleQuickAdd = async (description: string) => {
+    if (syncEnabled && SupabaseService.userId) {
+      await SupabaseService.createTask(description, currentEnergy || undefined);
+      const freshTasks = await SupabaseService.getOpenTasks();
+      setOpenTasks(freshTasks);
+    }
+    
+    const neroMessage: Message = { id: generateId(), role: 'nero', content: `Got it. "${description}" - added.`, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    await saveData(newMessages, memory);
   };
 
   const handleTaskComplete = async (task: Task) => {
@@ -779,7 +1064,6 @@ export default function App() {
     setOpenTasks(prev => prev.filter(t => t.id !== task.id));
     setCompletedTasks(prev => [{ ...task, status: 'completed', completedAt: new Date().toISOString() }, ...prev]);
     
-    // Quick celebration message
     const celebrations = ["✓ Done!", "Nice one.", "Knocked out.", "✓"];
     const neroMessage: Message = { id: generateId(), role: 'nero', content: celebrations[Math.floor(Math.random() * celebrations.length)], timestamp: new Date().toISOString() };
     const newMessages = [...messages, neroMessage];
@@ -804,7 +1088,6 @@ export default function App() {
 
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(userMessage);
 
-    // Update body double check-in time if in that mode
     if (bodyDoubleMode && bodyDoubleSession) {
       setBodyDoubleSession({ ...bodyDoubleSession, lastCheckIn: new Date().toISOString() });
     }
@@ -819,7 +1102,6 @@ export default function App() {
         setOpenTasks(prev => prev.filter(t => t.id !== matchingTask.id));
         setCompletedTasks(prev => [{ ...matchingTask, status: 'completed', completedAt: new Date().toISOString() }, ...prev]);
         
-        // If this was the body double task, celebrate
         if (bodyDoubleMode && bodyDoubleSession?.taskId === matchingTask.id) {
           await endBodyDoubleMode(true);
           setIsThinking(false);
@@ -982,7 +1264,77 @@ export default function App() {
     );
   }
 
-  // Settings with swipeable tasks
+  // Focus Stats Modal
+  if (showFocusStats && focusStats) {
+    const insight = FocusAnalytics.generateInsight(focusStats, memory.facts.name);
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.statsContainer}>
+          <View style={styles.statsCard}>
+            <View style={styles.statsHeader}>
+              <Text style={styles.statsTitle}>Focus Stats</Text>
+              <TouchableOpacity onPress={() => setShowFocusStats(false)}><Text style={styles.statsClose}>✕</Text></TouchableOpacity>
+            </View>
+            
+            {insight && (
+              <View style={styles.insightBanner}>
+                <Text style={styles.insightText}>💡 {insight}</Text>
+              </View>
+            )}
+            
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{focusStats.totalSessions}</Text>
+                <Text style={styles.statLabel}>Sessions</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{formatDurationShort(focusStats.totalFocusTime)}</Text>
+                <Text style={styles.statLabel}>Total Focus</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{focusStats.completionRate}%</Text>
+                <Text style={styles.statLabel}>Completed</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{formatDurationShort(focusStats.avgSessionLength)}</Text>
+                <Text style={styles.statLabel}>Avg Session</Text>
+              </View>
+            </View>
+
+            {(focusStats.bestTimeOfDay || focusStats.currentStreak > 0) && (
+              <View style={styles.statsExtras}>
+                {focusStats.bestTimeOfDay && (
+                  <View style={styles.extraItem}>
+                    <Text style={styles.extraLabel}>Best time</Text>
+                    <Text style={styles.extraValue}>{focusStats.bestTimeOfDay}</Text>
+                  </View>
+                )}
+                {focusStats.bestDayOfWeek !== null && (
+                  <View style={styles.extraItem}>
+                    <Text style={styles.extraLabel}>Best day</Text>
+                    <Text style={styles.extraValue}>{DAY_NAMES[focusStats.bestDayOfWeek]}</Text>
+                  </View>
+                )}
+                {focusStats.currentStreak > 0 && (
+                  <View style={styles.extraItem}>
+                    <Text style={styles.extraLabel}>Streak</Text>
+                    <Text style={styles.extraValue}>{focusStats.currentStreak} day{focusStats.currentStreak > 1 ? 's' : ''}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.statsButton} onPress={() => setShowFocusStats(false)}>
+              <Text style={styles.statsButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Settings
   if (showSettings) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1002,6 +1354,20 @@ export default function App() {
                   <Text style={styles.currentEnergyText}>{currentEnergy}/5 - {ENERGY_LABELS[currentEnergy - 1]}</Text>
                   <TouchableOpacity onPress={() => { setShowSettings(false); setCurrentEnergy(null); setShowEnergyCheck(true); }}><Text style={styles.updateLink}>Update</Text></TouchableOpacity>
                 </View>
+              </View>
+            )}
+
+            {focusStats && focusStats.totalSessions > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Focus Analytics</Text>
+                <TouchableOpacity style={styles.focusStatsPreview} onPress={() => { setShowSettings(false); setShowFocusStats(true); }}>
+                  <View style={styles.focusStatsRow}>
+                    <Text style={styles.focusStatMini}>{focusStats.totalSessions} sessions</Text>
+                    <Text style={styles.focusStatMini}>{formatDurationShort(focusStats.totalFocusTime)} total</Text>
+                    <Text style={styles.focusStatMini}>{focusStats.completionRate}% done</Text>
+                  </View>
+                  <Text style={styles.viewAllLink}>View details →</Text>
+                </TouchableOpacity>
               </View>
             )}
             
@@ -1069,7 +1435,7 @@ export default function App() {
     );
   }
 
-  // Main Chat (with body double mode indicator)
+  // Main Chat
   return (
     <SafeAreaView style={[styles.container, bodyDoubleMode && styles.bodyDoubleContainer]}>
       <StatusBar style="light" />
@@ -1139,7 +1505,18 @@ export default function App() {
             <Text style={styles.sendButtonText}>↑</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Floating Action Button for Quick Add */}
+        {!bodyDoubleMode && (
+          <Animated.View style={[styles.fab, { transform: [{ scale: fabAnim }] }]}>
+            <TouchableOpacity style={styles.fabButton} onPress={() => setShowQuickAdd(true)}>
+              <Text style={styles.fabText}>+</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </KeyboardAvoidingView>
+
+      <QuickAddModal visible={showQuickAdd} onClose={() => setShowQuickAdd(false)} onAdd={handleQuickAdd} voiceEnabled={voiceEnabled} />
     </SafeAreaView>
   );
 }
@@ -1173,7 +1550,7 @@ const styles = StyleSheet.create({
   focusTaskText: { color: COLORS.text, fontSize: 15 },
 
   messagesContainer: { flex: 1 },
-  messagesContent: { padding: 16, paddingBottom: 20 },
+  messagesContent: { padding: 16, paddingBottom: 80 },
   messageBubble: { maxWidth: '85%', padding: 14, borderRadius: 20, marginBottom: 12 },
   neroBubble: { backgroundColor: COLORS.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
   userBubble: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 6 },
@@ -1192,6 +1569,28 @@ const styles = StyleSheet.create({
   voiceButtonRecording: { backgroundColor: COLORS.recording, borderColor: COLORS.recording },
   voiceButtonSpeaking: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
   voiceButtonText: { fontSize: 20 },
+
+  // FAB
+  fab: { position: 'absolute', bottom: 90, right: 20 },
+  fabButton: { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.quickAdd, justifyContent: 'center', alignItems: 'center', shadowColor: COLORS.quickAdd, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 8 },
+  fabText: { color: COLORS.text, fontSize: 32, fontWeight: '300', marginTop: -2 },
+
+  // Quick Add Modal
+  quickAddOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  quickAddBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.7)' },
+  quickAddCard: { backgroundColor: COLORS.surface, borderRadius: 20, padding: 24, width: '90%', maxWidth: 400 },
+  quickAddTitle: { color: COLORS.text, fontSize: 20, fontWeight: '600', marginBottom: 16 },
+  quickAddInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
+  quickAddInput: { flex: 1, backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, color: COLORS.text, fontSize: 16, minHeight: 50, maxHeight: 100 },
+  quickAddVoice: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surfaceLight, justifyContent: 'center', alignItems: 'center' },
+  quickAddVoiceActive: { backgroundColor: COLORS.recording },
+  quickAddVoiceText: { fontSize: 18 },
+  quickAddActions: { flexDirection: 'row', gap: 12, marginTop: 16 },
+  quickAddCancel: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  quickAddCancelText: { color: COLORS.textMuted, fontSize: 16, fontWeight: '500' },
+  quickAddSubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.quickAdd, alignItems: 'center' },
+  quickAddSubmitDisabled: { opacity: 0.5 },
+  quickAddSubmitText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
 
   // Energy Check
   energyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -1228,6 +1627,25 @@ const styles = StyleSheet.create({
   checkInButtons: { flexDirection: 'row', gap: 12, marginBottom: 12 },
   checkInButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
   checkInButtonText: { color: COLORS.text, fontSize: 16 },
+
+  // Focus Stats
+  statsContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  statsCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  statsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  statsTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  statsClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  insightBanner: { backgroundColor: COLORS.bodyDouble + '20', borderRadius: 12, padding: 14, marginBottom: 20, borderLeftWidth: 3, borderLeftColor: COLORS.bodyDouble },
+  insightText: { color: COLORS.text, fontSize: 15, lineHeight: 22 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 20 },
+  statItem: { width: '47%', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, alignItems: 'center' },
+  statValue: { color: COLORS.text, fontSize: 28, fontWeight: '700' },
+  statLabel: { color: COLORS.textMuted, fontSize: 12, marginTop: 4 },
+  statsExtras: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  extraItem: { flex: 1, backgroundColor: COLORS.surfaceLight, borderRadius: 10, padding: 12, alignItems: 'center' },
+  extraLabel: { color: COLORS.textDim, fontSize: 11, marginBottom: 4 },
+  extraValue: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  statsButton: { backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
+  statsButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
 
   // Nudge
   nudgeContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
@@ -1274,6 +1692,11 @@ const styles = StyleSheet.create({
 
   bodyDoubleButton: { backgroundColor: COLORS.bodyDouble, borderRadius: 12, padding: 16, alignItems: 'center' },
   bodyDoubleButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
+
+  focusStatsPreview: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16 },
+  focusStatsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  focusStatMini: { color: COLORS.text, fontSize: 13 },
+  viewAllLink: { color: COLORS.bodyDouble, fontSize: 13, fontWeight: '500' },
 
   // Swipeable Task
   swipeContainer: { marginBottom: 8, position: 'relative', overflow: 'hidden', borderRadius: 12 },
