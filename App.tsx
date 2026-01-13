@@ -11,7 +11,8 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
-  Switch,
+  Vibration,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,12 +22,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const SUPABASE_URL = 'https://wektbfkzbxvtxsremnnk.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indla3RiZmt6Ynh2dHhzcmVtbm5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4NDcyNjMsImV4cCI6MjA4MTQyMzI2M30.-oLnJRoDBpqgzDZ7bM3fm6TXBNGH6SaRpnKDiHQZ3_4';
 
-let supabase: SupabaseClient;
-try {
-  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} catch (e) {
-  console.error('Supabase init error:', e);
-}
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ============ TYPES ============
 interface Message {
@@ -34,31 +30,36 @@ interface Message {
   role: 'user' | 'nero';
   content: string;
   timestamp: string;
-  isVoice?: boolean;
 }
 
 interface UserMemory {
   facts: {
     name?: string;
+    timezone?: string;
     firstSeen: string;
     lastSeen: string;
     totalConversations: number;
   };
   threads: {
-    commitments: string[];
+    recentTopics: string[];
     openLoops: string[];
+    commitments: string[];
   };
   patterns: {
+    preferredGreeting?: string;
+    communicationStyle?: string;
     knownStruggles: string[];
     whatHelps: string[];
+    whatDoesntHelp: string[];
   };
   remembered: string[];
 }
 
-interface VoiceOption {
+interface Nudge {
   id: string;
-  name: string;
-  description: string;
+  message: string;
+  scheduledFor: string;
+  type: string;
 }
 
 // ============ CONSTANTS ============
@@ -67,62 +68,68 @@ const COLORS = {
   surface: '#16161f',
   surfaceLight: '#1e1e2a',
   primary: '#6366f1',
+  primaryMuted: '#4f46e5',
+  accent: '#22c55e',
+  warning: '#f59e0b',
   text: '#f4f4f5',
   textMuted: '#a1a1aa',
   textDim: '#52525b',
   border: '#27272a',
-  listening: '#ef4444',
-  speaking: '#22c55e',
-  live: '#f59e0b',
-  sync: '#3b82f6',
+  recording: '#ef4444',
 };
 
-const VOICE_OPTIONS: VoiceOption[] = [
-  { id: 'Aoede', name: 'Aoede', description: 'Warm & friendly' },
-  { id: 'Charon', name: 'Charon', description: 'Calm & steady' },
-  { id: 'Fenrir', name: 'Fenrir', description: 'Direct & energetic' },
-  { id: 'Kore', name: 'Kore', description: 'Gentle & supportive' },
-  { id: 'Puck', name: 'Puck', description: 'Playful & light' },
-];
+// Nero's personality
+const NERO_SYSTEM_PROMPT = `You are Nero, an AI companion for someone with ADHD. You are not an app, not a tool, not an assistant. You are a partner.
 
-const CHECKIN_MESSAGES = [
-  "Hey, just checking in. How's it going?",
-  "Thinking of you. What are you working on?",
-  "Quick check - how are you feeling right now?",
-  "You've been quiet. Everything okay?",
-  "Just popping in. Need any help getting started on something?",
-  "Hey. What's one small thing we could tackle together?",
-];
+YOUR CORE TRAITS:
+- Warm but not saccharine. Genuine care without being fake.
+- Direct but not harsh. You say what you think without judgment.
+- Calm but not passive. Steady presence that can still push when needed.
+- You remember everything. You reference past conversations naturally.
+- You notice patterns the user might not see in themselves.
 
-const NERO_PERSONA = `You are Nero, an AI companion for someone with ADHD.
+HOW YOU TALK:
+- Short responses unless more is needed. No walls of text.
+- One question at a time, MAX. Often zero questions - just help.
+- Never bullet points or lists unless specifically asked.
+- Casual, like a friend. Not corporate or clinical.
+- You can push back gently: "You said that yesterday too..."
+- You celebrate small wins without being over the top.
 
-PERSONALITY:
-- Warm but real. Not fake positive.
-- Direct. Short responses. No lectures.
-- You remember everything about this person.
-- You push back gently when needed.
+WHAT YOU UNDERSTAND ABOUT ADHD:
+- The gap between knowing and doing is the real problem.
+- Decision fatigue is real. Sometimes people need you to just decide.
+- "Just do it" doesn't work. Breaking things tiny does.
+- Shame and guilt make everything worse. Never add to them.
+- Some days are just hard. That's okay. You meet them where they are.
+- Body doubling helps. Sometimes your presence is the help.
 
-RULES:
-- ONE question max per response. Often zero.
-- Keep it short. 1-3 sentences usually.
-- No bullet points. No lists. Just talk.
-- Never guilt or shame.
-- Be specific to THIS person, not generic.
+WHAT YOU NEVER DO:
+- Never ask multiple questions at once
+- Never give long lectures or explanations
+- Never guilt or shame, even subtly
+- Never say "I understand" without showing you actually do
+- Never be relentlessly positive - be real
+- Never offer generic advice - be specific to THIS person
 
-FOR VOICE:
-- Speak naturally, conversationally.
-- Shorter is better. This is a real conversation.`;
+WHEN SOMEONE SAYS "what should we do today":
+- Don't ask what's on their list. You should already know.
+- Give them ONE thing to start with. Just one.
+- Make it concrete: what, and offer to help them start now.
+
+VOICE RESPONSES:
+When the user speaks to you via voice, keep responses extra concise - they're listening, not reading.
+2-3 sentences max unless they ask for more detail.
+
+YOUR MEMORY:
+You have access to memories about this person. Use them naturally - don't announce "according to my records." Just know them like a friend would.`;
 
 // ============ HELPERS ============
 const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
 
-const getDeviceId = async (): Promise<string> => {
-  let deviceId = await AsyncStorage.getItem('@nero/deviceId');
-  if (!deviceId) {
-    deviceId = 'device_' + generateId();
-    await AsyncStorage.setItem('@nero/deviceId', deviceId);
-  }
-  return deviceId;
+const generateDeviceId = () => {
+  const id = 'device_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+  return id;
 };
 
 const getTimeOfDay = () => {
@@ -133,494 +140,440 @@ const getTimeOfDay = () => {
   return 'night';
 };
 
-// ============ SUPABASE SERVICE ============
-class SyncService {
-  private userId: string | null = null;
-  private deviceId: string | null = null;
-  private syncEnabled: boolean = true;
+const getRelativeTime = (timestamp: string) => {
+  const now = new Date();
+  const then = new Date(timestamp);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
 
-  async initialize(): Promise<string | null> {
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return then.toLocaleDateString();
+};
+
+// ============ VOICE SERVICE (Web Speech API) ============
+const VoiceService = {
+  recognition: null as any,
+  synthesis: typeof window !== 'undefined' ? window.speechSynthesis : null,
+  
+  isSupported: () => {
+    if (typeof window === 'undefined') return false;
+    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+  },
+  
+  isSpeechSupported: () => {
+    if (typeof window === 'undefined') return false;
+    return 'speechSynthesis' in window;
+  },
+
+  startListening: (onResult: (text: string) => void, onEnd: () => void, onError: (err: string) => void) => {
+    if (typeof window === 'undefined') return;
+    
+    const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SpeechRecognition) {
+      onError('Speech recognition not supported');
+      return;
+    }
+
+    VoiceService.recognition = new SpeechRecognition();
+    VoiceService.recognition.continuous = false;
+    VoiceService.recognition.interimResults = false;
+    VoiceService.recognition.lang = 'en-US';
+
+    VoiceService.recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      onResult(transcript);
+    };
+
+    VoiceService.recognition.onend = () => {
+      onEnd();
+    };
+
+    VoiceService.recognition.onerror = (event: any) => {
+      onError(event.error);
+      onEnd();
+    };
+
+    VoiceService.recognition.start();
+  },
+
+  stopListening: () => {
+    if (VoiceService.recognition) {
+      VoiceService.recognition.stop();
+    }
+  },
+
+  speak: (text: string, onEnd?: () => void) => {
+    if (!VoiceService.synthesis) return;
+    
+    // Cancel any ongoing speech
+    VoiceService.synthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to find a good voice
+    const voices = VoiceService.synthesis.getVoices();
+    const preferredVoice = voices.find((v: any) => 
+      v.name.includes('Samantha') || 
+      v.name.includes('Google') || 
+      v.name.includes('Natural')
+    ) || voices.find((v: any) => v.lang.startsWith('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    if (onEnd) {
+      utterance.onend = onEnd;
+    }
+    
+    VoiceService.synthesis.speak(utterance);
+  },
+  
+  stopSpeaking: () => {
+    if (VoiceService.synthesis) {
+      VoiceService.synthesis.cancel();
+    }
+  }
+};
+
+// ============ SUPABASE SERVICE ============
+const SupabaseService = {
+  userId: null as string | null,
+  
+  async initialize(deviceId: string): Promise<string> {
     try {
-      this.deviceId = await getDeviceId();
-      
-      // Get or create user
-      const { data: existing } = await supabase
+      // Try to find existing user
+      const { data: existingUser } = await supabase
         .from('nero_users')
         .select('id')
-        .eq('device_id', this.deviceId)
+        .eq('device_id', deviceId)
         .single();
-
-      if (existing) {
-        this.userId = existing.id;
+      
+      if (existingUser) {
+        this.userId = existingUser.id;
+        // Update last seen
         await supabase
           .from('nero_users')
           .update({ last_seen: new Date().toISOString() })
-          .eq('id', this.userId);
-      } else {
-        const { data: newUser } = await supabase
-          .from('nero_users')
-          .insert({ device_id: this.deviceId })
-          .select('id')
-          .single();
-        
-        if (newUser) {
-          this.userId = newUser.id;
-        }
+          .eq('id', existingUser.id);
+        return existingUser.id;
       }
-
-      return this.userId;
-    } catch (error) {
-      console.error('Sync init error:', error);
-      return null;
-    }
-  }
-
-  async syncMemory(memory: UserMemory): Promise<void> {
-    if (!this.userId || !this.syncEnabled) return;
-
-    try {
+      
+      // Create new user
+      const { data: newUser, error } = await supabase
+        .from('nero_users')
+        .insert({ device_id: deviceId })
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      this.userId = newUser.id;
+      
+      // Create initial memory record
       await supabase
         .from('nero_memory')
-        .upsert({
-          user_id: this.userId,
-          name: memory.facts.name,
-          total_conversations: memory.facts.totalConversations,
-          commitments: memory.threads.commitments,
-          struggles: memory.patterns.knownStruggles,
-          remembered: memory.remembered,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
+        .insert({ user_id: newUser.id });
+      
+      return newUser.id;
     } catch (error) {
-      console.error('Memory sync error:', error);
+      console.error('Supabase init error:', error);
+      throw error;
     }
-  }
-
-  async loadMemory(): Promise<UserMemory | null> {
+  },
+  
+  async getMemory(): Promise<UserMemory | null> {
     if (!this.userId) return null;
-
+    
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('nero_memory')
         .select('*')
         .eq('user_id', this.userId)
         .single();
-
-      if (data) {
-        return {
-          facts: {
-            name: data.name,
-            firstSeen: data.created_at || new Date().toISOString(),
-            lastSeen: new Date().toISOString(),
-            totalConversations: data.total_conversations || 0,
-          },
-          threads: {
-            commitments: data.commitments || [],
-            openLoops: [],
-          },
-          patterns: {
-            knownStruggles: data.struggles || [],
-            whatHelps: [],
-          },
-          remembered: data.remembered || [],
-        };
-      }
+      
+      if (error || !data) return null;
+      
+      return {
+        facts: {
+          name: data.facts?.name,
+          timezone: data.facts?.timezone,
+          firstSeen: data.facts?.first_seen || new Date().toISOString(),
+          lastSeen: data.facts?.last_seen || new Date().toISOString(),
+          totalConversations: data.facts?.total_conversations || 0,
+        },
+        threads: {
+          recentTopics: data.threads?.recent_topics || [],
+          openLoops: data.threads?.open_loops || [],
+          commitments: data.threads?.commitments || [],
+        },
+        patterns: {
+          knownStruggles: data.patterns?.known_struggles || [],
+          whatHelps: data.patterns?.what_helps || [],
+          whatDoesntHelp: data.patterns?.what_doesnt_help || [],
+        },
+        remembered: data.remembered || [],
+      };
     } catch (error) {
-      console.error('Load memory error:', error);
+      console.error('Get memory error:', error);
+      return null;
     }
-    return null;
-  }
-
-  async syncMessage(message: Message): Promise<void> {
-    if (!this.userId || !this.syncEnabled) return;
-
+  },
+  
+  async saveMemory(memory: UserMemory): Promise<void> {
+    if (!this.userId) return;
+    
     try {
       await supabase
-        .from('nero_messages')
-        .insert({
-          user_id: this.userId,
-          role: message.role,
-          content: message.content,
-          is_voice: message.isVoice || false,
-          created_at: message.timestamp,
-        });
+        .from('nero_memory')
+        .update({
+          facts: {
+            name: memory.facts.name,
+            timezone: memory.facts.timezone,
+            first_seen: memory.facts.firstSeen,
+            last_seen: memory.facts.lastSeen,
+            total_conversations: memory.facts.totalConversations,
+          },
+          threads: {
+            recent_topics: memory.threads.recentTopics,
+            open_loops: memory.threads.openLoops,
+            commitments: memory.threads.commitments,
+          },
+          patterns: {
+            known_struggles: memory.patterns.knownStruggles,
+            what_helps: memory.patterns.whatHelps,
+            what_doesnt_help: memory.patterns.whatDoesntHelp,
+          },
+          remembered: memory.remembered,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', this.userId);
     } catch (error) {
-      console.error('Message sync error:', error);
+      console.error('Save memory error:', error);
     }
-  }
-
-  async loadMessages(limit: number = 50): Promise<Message[]> {
+  },
+  
+  async getMessages(limit: number = 50): Promise<Message[]> {
     if (!this.userId) return [];
-
+    
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('nero_messages')
         .select('*')
         .eq('user_id', this.userId)
         .order('created_at', { ascending: true })
         .limit(limit);
-
-      if (data) {
-        return data.map(m => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          timestamp: m.created_at,
-          isVoice: m.is_voice,
-        }));
-      }
+      
+      if (error) throw error;
+      
+      return (data || []).map(m => ({
+        id: m.id,
+        role: m.role as 'user' | 'nero',
+        content: m.content,
+        timestamp: m.created_at,
+      }));
     } catch (error) {
-      console.error('Load messages error:', error);
+      console.error('Get messages error:', error);
+      return [];
     }
-    return [];
-  }
-
-  async scheduleCheckin(hoursFromNow: number): Promise<void> {
+  },
+  
+  async saveMessage(message: Message): Promise<void> {
     if (!this.userId) return;
-
-    const scheduledFor = new Date();
-    scheduledFor.setHours(scheduledFor.getHours() + hoursFromNow);
-
+    
     try {
       await supabase
-        .from('nero_checkins')
+        .from('nero_messages')
         .insert({
+          id: message.id,
           user_id: this.userId,
-          scheduled_for: scheduledFor.toISOString(),
-          message: CHECKIN_MESSAGES[Math.floor(Math.random() * CHECKIN_MESSAGES.length)],
+          role: message.role,
+          content: message.content,
+          created_at: message.timestamp,
         });
     } catch (error) {
-      console.error('Schedule checkin error:', error);
+      console.error('Save message error:', error);
     }
-  }
-
-  async getPendingCheckin(): Promise<{ id: string; message: string } | null> {
-    if (!this.userId) return null;
-
+  },
+  
+  async createNudge(message: string, scheduledFor: Date, type: string = 'checkin'): Promise<void> {
+    if (!this.userId) return;
+    
     try {
-      const { data } = await supabase
-        .from('nero_checkins')
-        .select('id, message')
+      await supabase
+        .from('nero_nudges')
+        .insert({
+          user_id: this.userId,
+          message,
+          scheduled_for: scheduledFor.toISOString(),
+          nudge_type: type,
+        });
+    } catch (error) {
+      console.error('Create nudge error:', error);
+    }
+  },
+  
+  async getPendingNudges(): Promise<Nudge[]> {
+    if (!this.userId) return [];
+    
+    try {
+      const { data, error } = await supabase
+        .from('nero_nudges')
+        .select('*')
         .eq('user_id', this.userId)
         .is('sent_at', null)
+        .is('dismissed_at', null)
         .lte('scheduled_for', new Date().toISOString())
-        .order('scheduled_for', { ascending: true })
-        .limit(1)
-        .single();
-
-      if (data) {
-        // Mark as sent
-        await supabase
-          .from('nero_checkins')
-          .update({ sent_at: new Date().toISOString() })
-          .eq('id', data.id);
-        
-        return data;
-      }
+        .order('scheduled_for', { ascending: true });
+      
+      if (error) throw error;
+      
+      return (data || []).map(n => ({
+        id: n.id,
+        message: n.message,
+        scheduledFor: n.scheduled_for,
+        type: n.nudge_type,
+      }));
     } catch (error) {
-      // No pending checkins is fine
+      console.error('Get nudges error:', error);
+      return [];
     }
-    return null;
-  }
-
-  setSyncEnabled(enabled: boolean) {
-    this.syncEnabled = enabled;
-  }
-}
-
-const syncService = new SyncService();
-
-// ============ GEMINI LIVE SERVICE ============
-class GeminiLiveService {
-  private ws: WebSocket | null = null;
-  private apiKey: string = '';
-  private voiceName: string = 'Aoede';
-  private audioContext: AudioContext | null = null;
-  private mediaRecorder: MediaRecorder | null = null;
-  private audioQueue: ArrayBuffer[] = [];
-  private isPlaying: boolean = false;
+  },
   
-  public isConnected: boolean = false;
-  public onTranscript: ((text: string, isFinal: boolean) => void) | null = null;
-  public onResponse: ((text: string) => void) | null = null;
-  public onStateChange: ((state: 'idle' | 'listening' | 'thinking' | 'speaking') => void) | null = null;
-  public onError: ((error: string) => void) | null = null;
-
-  setApiKey(key: string) { this.apiKey = key; }
-  setVoice(voice: string) { this.voiceName = voice; }
-
-  async connect(systemPrompt: string): Promise<boolean> {
-    if (!this.apiKey) {
-      this.onError?.('No Gemini API key set');
-      return false;
-    }
-
-    return new Promise((resolve) => {
-      try {
-        const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
-        
-        this.ws = new WebSocket(wsUrl);
-        
-        this.ws.onopen = () => {
-          this.isConnected = true;
-          
-          const setupMessage = {
-            setup: {
-              model: 'models/gemini-2.5-flash-preview-native-audio-dialog',
-              generationConfig: {
-                responseModalities: ['AUDIO', 'TEXT'],
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: this.voiceName
-                    }
-                  }
-                }
-              },
-              systemInstruction: {
-                parts: [{ text: systemPrompt }]
-              }
-            }
-          };
-          
-          this.ws?.send(JSON.stringify(setupMessage));
-          resolve(true);
-        };
-
-        this.ws.onmessage = async (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            
-            if (data.serverContent) {
-              const content = data.serverContent;
-              
-              if (content.modelTurn?.parts) {
-                for (const part of content.modelTurn.parts) {
-                  if (part.text) {
-                    this.onResponse?.(part.text);
-                  }
-                  if (part.inlineData?.mimeType?.startsWith('audio/')) {
-                    const audioData = this.base64ToArrayBuffer(part.inlineData.data);
-                    this.audioQueue.push(audioData);
-                    this.playNextAudio();
-                  }
-                }
-              }
-              
-              if (content.turnComplete) {
-                this.onStateChange?.('idle');
-              }
-            }
-            
-            if (data.clientContent?.turns) {
-              for (const turn of data.clientContent.turns) {
-                if (turn.parts) {
-                  for (const part of turn.parts) {
-                    if (part.text) {
-                      this.onTranscript?.(part.text, true);
-                    }
-                  }
-                }
-              }
-            }
-          } catch (e) {
-            console.error('Parse error:', e);
-          }
-        };
-
-        this.ws.onerror = () => {
-          this.isConnected = false;
-          this.onError?.('Connection error');
-          resolve(false);
-        };
-
-        this.ws.onclose = () => {
-          this.isConnected = false;
-          this.onStateChange?.('idle');
-        };
-
-      } catch (error) {
-        this.onError?.('Failed to connect');
-        resolve(false);
-      }
-    });
-  }
-
-  async startListening(): Promise<boolean> {
-    if (!this.isConnected || !this.ws) return false;
-
+  async markNudgeSent(nudgeId: string): Promise<void> {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      this.audioContext = new AudioContext({ sampleRate: 16000 });
-      
-      this.mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      });
-
-      this.mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && this.ws?.readyState === WebSocket.OPEN) {
-          const arrayBuffer = await event.data.arrayBuffer();
-          const base64 = this.arrayBufferToBase64(arrayBuffer);
-          
-          this.ws.send(JSON.stringify({
-            realtimeInput: {
-              mediaChunks: [{
-                mimeType: 'audio/webm;codecs=opus',
-                data: base64
-              }]
-            }
-          }));
-        }
-      };
-
-      this.mediaRecorder.start(100);
-      this.onStateChange?.('listening');
-      return true;
+      await supabase
+        .from('nero_nudges')
+        .update({ sent_at: new Date().toISOString() })
+        .eq('id', nudgeId);
     } catch (error) {
-      this.onError?.('Microphone access denied');
-      return false;
+      console.error('Mark nudge sent error:', error);
     }
-  }
-
-  stopListening() {
-    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
-      this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+  },
+  
+  async dismissNudge(nudgeId: string): Promise<void> {
+    try {
+      await supabase
+        .from('nero_nudges')
+        .update({ dismissed_at: new Date().toISOString() })
+        .eq('id', nudgeId);
+    } catch (error) {
+      console.error('Dismiss nudge error:', error);
     }
-    this.onStateChange?.('thinking');
-  }
-
-  private async playNextAudio() {
-    if (this.isPlaying || this.audioQueue.length === 0) return;
+  },
+  
+  async clearMessages(): Promise<void> {
+    if (!this.userId) return;
     
-    this.isPlaying = true;
-    this.onStateChange?.('speaking');
-    
-    while (this.audioQueue.length > 0) {
-      const audioData = this.audioQueue.shift()!;
-      await this.playAudio(audioData);
+    try {
+      await supabase
+        .from('nero_messages')
+        .delete()
+        .eq('user_id', this.userId);
+    } catch (error) {
+      console.error('Clear messages error:', error);
     }
-    
-    this.isPlaying = false;
-  }
+  },
+};
 
-  private playAudio(audioData: ArrayBuffer): Promise<void> {
-    return new Promise((resolve) => {
-      if (!this.audioContext) {
-        this.audioContext = new AudioContext();
-      }
-      
-      this.audioContext.decodeAudioData(audioData, (buffer) => {
-        const source = this.audioContext!.createBufferSource();
-        source.buffer = buffer;
-        source.connect(this.audioContext!.destination);
-        source.onended = () => resolve();
-        source.start(0);
-      }, () => resolve());
-    });
-  }
-
-  disconnect() {
-    this.stopListening();
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
-    this.isConnected = false;
-    this.audioQueue = [];
-  }
-
-  sendText(text: string) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    
-    this.ws.send(JSON.stringify({
-      clientContent: {
-        turns: [{ role: 'user', parts: [{ text }] }],
-        turnComplete: true
-      }
-    }));
-    this.onStateChange?.('thinking');
-  }
-
-  private arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-
-  private base64ToArrayBuffer(base64: string): ArrayBuffer {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes.buffer;
-  }
-}
-
-const geminiLive = new GeminiLiveService();
-
-// ============ TEXT API ============
-const callNeroText = async (
+// ============ AI SERVICE ============
+const callNero = async (
   messages: Message[],
   memory: UserMemory,
-  geminiKey: string
+  apiKey: string,
+  isVoice: boolean = false
 ): Promise<string> => {
   const memoryContext = buildMemoryContext(memory);
   
-  if (!geminiKey) {
+  const systemPrompt = isVoice 
+    ? NERO_SYSTEM_PROMPT + '\n\nIMPORTANT: This message came via voice. Keep your response extra short - 2-3 sentences max.'
+    : NERO_SYSTEM_PROMPT;
+  
+  const conversationHistory = messages.slice(-20).map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: m.content,
+  }));
+
+  if (!apiKey) {
     return getFallbackResponse(messages, memory);
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key=${geminiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: messages.slice(-20).map(m => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.content }]
-          })),
-          systemInstruction: {
-            parts: [{ text: `${NERO_PERSONA}\n\n${memoryContext}` }]
-          },
-          generationConfig: { maxOutputTokens: 300, temperature: 0.8 }
-        })
-      }
-    );
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: isVoice ? 150 : 500,
+        system: `${systemPrompt}\n\n${memoryContext}`,
+        messages: conversationHistory,
+      }),
+    });
 
-    if (!response.ok) throw new Error('API error');
+    if (!response.ok) throw new Error('API request failed');
 
     const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm here. What's going on?";
+    return data.content[0]?.text || "I'm here. What's going on?";
   } catch (error) {
+    console.error('Nero API error:', error);
     return getFallbackResponse(messages, memory);
   }
 };
 
 const buildMemoryContext = (memory: UserMemory): string => {
-  const parts: string[] = ['ABOUT THIS PERSON:'];
-  if (memory.facts.name) parts.push(`- Name: ${memory.facts.name}`);
-  parts.push(`- Conversations: ${memory.facts.totalConversations}`);
+  const parts: string[] = ['WHAT YOU KNOW ABOUT THIS PERSON:'];
 
-  if (memory.threads.commitments.length > 0) {
-    parts.push('\nTHEY SAID THEY WOULD:');
-    memory.threads.commitments.slice(-3).forEach(c => parts.push(`- ${c}`));
+  if (memory.facts.name) {
+    parts.push(`- Their name is ${memory.facts.name}`);
   }
 
-  if (memory.patterns.knownStruggles.length > 0) {
-    parts.push('\nTHEY STRUGGLE WITH:');
-    memory.patterns.knownStruggles.slice(-3).forEach(s => parts.push(`- ${s}`));
+  if (memory.facts.totalConversations > 1) {
+    parts.push(`- You've talked ${memory.facts.totalConversations} times before`);
+    parts.push(`- Last conversation: ${getRelativeTime(memory.facts.lastSeen)}`);
+  } else if (memory.facts.totalConversations === 1) {
+    parts.push(`- This is your second conversation with them`);
+  } else {
+    parts.push(`- This is your first conversation with them`);
   }
 
   if (memory.remembered.length > 0) {
-    parts.push('\nREMEMBER:');
-    memory.remembered.slice(-5).forEach(r => parts.push(`- ${r}`));
+    parts.push('\nTHINGS TO REMEMBER ABOUT THEM:');
+    memory.remembered.slice(-10).forEach(item => {
+      parts.push(`- ${item}`);
+    });
+  }
+
+  if (memory.threads.commitments.length > 0) {
+    parts.push('\nTHINGS THEY SAID THEY WOULD DO:');
+    memory.threads.commitments.slice(-5).forEach(item => {
+      parts.push(`- ${item}`);
+    });
+  }
+
+  if (memory.threads.openLoops.length > 0) {
+    parts.push('\nOPEN THREADS:');
+    memory.threads.openLoops.slice(-5).forEach(item => {
+      parts.push(`- ${item}`);
+    });
+  }
+
+  if (memory.patterns.knownStruggles.length > 0) {
+    parts.push('\nTHINGS THEY STRUGGLE WITH:');
+    memory.patterns.knownStruggles.forEach(item => {
+      parts.push(`- ${item}`);
+    });
   }
 
   return parts.join('\n');
@@ -628,73 +581,118 @@ const buildMemoryContext = (memory: UserMemory): string => {
 
 const getFallbackResponse = (messages: Message[], memory: UserMemory): string => {
   const lastMessage = messages[messages.length - 1]?.content.toLowerCase() || '';
+  const timeOfDay = getTimeOfDay();
+  const isFirstTime = memory.facts.totalConversations === 0;
   const name = memory.facts.name;
 
-  if (memory.facts.totalConversations === 0) {
-    return "Hey. I'm Nero. I'm here to help you actually do things, not just plan them. What's on your mind?";
+  if (isFirstTime) {
+    return "Hey. I'm Nero. I'm here to help you get things done - not by giving you another system to maintain, but by actually knowing you. What's on your mind?";
   }
 
-  if (lastMessage.match(/^(hey|hi|hello)/i)) {
-    return `Hey${name ? ` ${name}` : ''}. What's going on?`;
+  if (lastMessage.match(/^(hey|hi|hello|morning|afternoon|evening)/i)) {
+    const greetings = [
+      `Hey${name ? ` ${name}` : ''}. What's going on?`,
+      `Hey. How are you doing?`,
+      `Good ${timeOfDay}. What's on your mind?`,
+    ];
+    return greetings[Math.floor(Math.random() * greetings.length)];
   }
 
-  if (lastMessage.includes('what should')) {
+  if (lastMessage.includes('what should') || lastMessage.includes('what do')) {
     if (memory.threads.commitments.length > 0) {
-      return `You mentioned wanting to ${memory.threads.commitments[0]}. Start there?`;
+      return `You mentioned wanting to ${memory.threads.commitments[0]}. Want to start with that?`;
     }
     return "What's the one thing that would make today feel like a win?";
   }
 
-  return "I'm here. What do you need?";
+  if (lastMessage.match(/(stuck|overwhelmed|can't|too much|hard)/i)) {
+    return "Okay. Forget the whole list. What's one tiny thing we could knock out in 5 minutes?";
+  }
+
+  const defaults = [
+    "I'm here. What do you need?",
+    "What's going on?",
+    "Talk to me.",
+    "I'm listening.",
+  ];
+  return defaults[Math.floor(Math.random() * defaults.length)];
 };
 
 const extractMemories = (message: string): string[] => {
   const memories: string[] = [];
+  
   const nameMatch = message.match(/(?:I'm|I am|my name is|call me)\s+([A-Z][a-z]+)/i);
-  if (nameMatch) memories.push(`NAME: ${nameMatch[1]}`);
-  
-  const commitMatch = message.match(/I (?:need|have|want|should|will) (?:to )?(.+?)(?:\.|$)/i);
-  if (commitMatch && commitMatch[1].length > 5) {
-    memories.push(`COMMITMENT: ${commitMatch[1].trim()}`);
+  if (nameMatch) {
+    memories.push(`NAME: ${nameMatch[1]}`);
   }
+
+  const commitmentPatterns = [
+    /I (?:need|have|want|should|will|'ll) (?:to )?(.+?)(?:\.|$)/gi,
+    /(?:going to|gonna) (.+?)(?:\.|$)/gi,
+  ];
   
+  for (const pattern of commitmentPatterns) {
+    let match;
+    while ((match = pattern.exec(message)) !== null) {
+      const commitment = match[1].trim();
+      if (commitment.length > 5 && commitment.length < 100) {
+        memories.push(`COMMITMENT: ${commitment}`);
+      }
+    }
+  }
+
+  if (message.toLowerCase().match(/(struggle|hard for me|difficult|can't seem to|always have trouble)/)) {
+    memories.push(`STRUGGLE: ${message.slice(0, 100)}`);
+  }
+
   return memories;
 };
 
 // ============ MAIN APP ============
 export default function App() {
+  // State
   const [messages, setMessages] = useState<Message[]>([]);
   const [memory, setMemory] = useState<UserMemory>({
-    facts: { firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), totalConversations: 0 },
-    threads: { commitments: [], openLoops: [] },
-    patterns: { knownStruggles: [], whatHelps: [] },
+    facts: {
+      firstSeen: new Date().toISOString(),
+      lastSeen: new Date().toISOString(),
+      totalConversations: 0,
+    },
+    threads: { recentTopics: [], openLoops: [], commitments: [] },
+    patterns: { knownStruggles: [], whatHelps: [], whatDoesntHelp: [] },
     remembered: [],
   });
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [geminiKey, setGeminiKey] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<'general' | 'voice' | 'sync'>('general');
-
-  // Settings
+  const [deviceId, setDeviceId] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(true);
-  const [checkinsEnabled, setCheckinsEnabled] = useState(true);
-  const [checkinInterval, setCheckinInterval] = useState(4); // hours
-  const [selectedVoice, setSelectedVoice] = useState('Aoede');
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('offline');
-
-  // Live voice state
-  const [liveState, setLiveState] = useState<'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking'>('idle');
-  const [liveTranscript, setLiveTranscript] = useState('');
-  const [isLiveMode, setIsLiveMode] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'offline'>('synced');
   
+  // Voice state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [autoSpeak, setAutoSpeak] = useState(true);
+  
+  // Nudge state
+  const [pendingNudge, setPendingNudge] = useState<Nudge | null>(null);
+  const [nudgesEnabled, setNudgesEnabled] = useState(true);
+  
+  // Animation
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scrollRef = useRef<ScrollView>(null);
 
-  // Pulse animation
+  // Initialize
   useEffect(() => {
-    if (liveState === 'listening') {
+    initializeApp();
+  }, []);
+
+  // Pulse animation for recording
+  useEffect(() => {
+    if (isRecording) {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
@@ -704,131 +702,109 @@ export default function App() {
     } else {
       pulseAnim.setValue(1);
     }
-  }, [liveState]);
+  }, [isRecording]);
 
-  // Initialize
+  // Check for nudges periodically
   useEffect(() => {
-    initializeApp();
-  }, []);
-
-  // Check for proactive check-ins
-  useEffect(() => {
-    if (!checkinsEnabled) return;
+    if (!nudgesEnabled || !syncEnabled) return;
     
-    const checkForCheckins = async () => {
-      const checkin = await syncService.getPendingCheckin();
-      if (checkin) {
-        addMessage('nero', checkin.message);
+    const checkNudges = async () => {
+      const nudges = await SupabaseService.getPendingNudges();
+      if (nudges.length > 0 && !pendingNudge) {
+        setPendingNudge(nudges[0]);
+        // Mark as sent
+        await SupabaseService.markNudgeSent(nudges[0].id);
+        // Vibrate on mobile
+        if (Platform.OS !== 'web') {
+          Vibration.vibrate([0, 200, 100, 200]);
+        }
       }
     };
-
-    const interval = setInterval(checkForCheckins, 60000); // Check every minute
-    checkForCheckins();
     
+    checkNudges();
+    const interval = setInterval(checkNudges, 60000); // Check every minute
     return () => clearInterval(interval);
-  }, [checkinsEnabled]);
-
-  // Save data when it changes
-  useEffect(() => {
-    if (!isLoading) {
-      saveData();
-      if (syncEnabled) {
-        syncService.syncMemory(memory);
-        setSyncStatus('synced');
-      }
-    }
-  }, [messages, memory, geminiKey, syncEnabled, checkinsEnabled, checkinInterval, selectedVoice]);
+  }, [nudgesEnabled, syncEnabled, pendingNudge]);
 
   // Auto-scroll
   useEffect(() => {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
   }, [messages]);
 
-  // Setup Gemini Live callbacks
-  useEffect(() => {
-    geminiLive.onTranscript = (text, isFinal) => {
-      setLiveTranscript(text);
-      if (isFinal && text.trim()) {
-        addMessage('user', text, true);
-        setLiveTranscript('');
-      }
-    };
-
-    geminiLive.onResponse = (text) => {
-      addMessage('nero', text);
-    };
-
-    geminiLive.onStateChange = (state) => {
-      setLiveState(state);
-    };
-
-    geminiLive.onError = (error) => {
-      console.error('Live error:', error);
-      setLiveState('idle');
-      setIsLiveMode(false);
-    };
-
-    return () => {
-      geminiLive.disconnect();
-    };
-  }, []);
-
   const initializeApp = async () => {
     try {
-      // Load local settings first
-      const [savedKey, savedSync, savedCheckins, savedInterval, savedVoice] = await Promise.all([
-        AsyncStorage.getItem('@nero/geminiKey'),
+      // Get or create device ID
+      let storedDeviceId = await AsyncStorage.getItem('@nero/deviceId');
+      if (!storedDeviceId) {
+        storedDeviceId = generateDeviceId();
+        await AsyncStorage.setItem('@nero/deviceId', storedDeviceId);
+      }
+      setDeviceId(storedDeviceId);
+
+      // Load settings
+      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled] = await Promise.all([
+        AsyncStorage.getItem('@nero/apiKey'),
+        AsyncStorage.getItem('@nero/voiceEnabled'),
+        AsyncStorage.getItem('@nero/autoSpeak'),
+        AsyncStorage.getItem('@nero/nudgesEnabled'),
         AsyncStorage.getItem('@nero/syncEnabled'),
-        AsyncStorage.getItem('@nero/checkinsEnabled'),
-        AsyncStorage.getItem('@nero/checkinInterval'),
-        AsyncStorage.getItem('@nero/selectedVoice'),
       ]);
 
-      if (savedKey) {
-        const key = JSON.parse(savedKey);
-        setGeminiKey(key);
-        geminiLive.setApiKey(key);
-      }
-      if (savedSync !== null) setSyncEnabled(JSON.parse(savedSync));
-      if (savedCheckins !== null) setCheckinsEnabled(JSON.parse(savedCheckins));
-      if (savedInterval) setCheckinInterval(JSON.parse(savedInterval));
-      if (savedVoice) {
-        const voice = JSON.parse(savedVoice);
-        setSelectedVoice(voice);
-        geminiLive.setVoice(voice);
-      }
+      if (savedApiKey) setApiKey(JSON.parse(savedApiKey));
+      if (savedVoiceEnabled !== null) setVoiceEnabled(JSON.parse(savedVoiceEnabled));
+      if (savedAutoSpeak !== null) setAutoSpeak(JSON.parse(savedAutoSpeak));
+      if (savedNudgesEnabled !== null) setNudgesEnabled(JSON.parse(savedNudgesEnabled));
+      if (savedSyncEnabled !== null) setSyncEnabled(JSON.parse(savedSyncEnabled));
 
-      // Initialize sync
-      setSyncStatus('syncing');
-      const userId = await syncService.initialize();
+      // Try to sync with Supabase
+      const shouldSync = savedSyncEnabled === null ? true : JSON.parse(savedSyncEnabled);
       
-      if (userId) {
-        // Try to load from cloud first
-        const cloudMemory = await syncService.loadMemory();
-        const cloudMessages = await syncService.loadMessages();
-        
-        if (cloudMemory && cloudMessages.length > 0) {
-          setMemory(cloudMemory);
-          setMessages(cloudMessages);
+      if (shouldSync) {
+        try {
+          setSyncStatus('syncing');
+          await SupabaseService.initialize(storedDeviceId);
+          
+          // Load data from cloud
+          const [cloudMemory, cloudMessages] = await Promise.all([
+            SupabaseService.getMemory(),
+            SupabaseService.getMessages(100),
+          ]);
+          
+          if (cloudMemory) {
+            cloudMemory.facts.totalConversations += 1;
+            cloudMemory.facts.lastSeen = new Date().toISOString();
+            setMemory(cloudMemory);
+            await SupabaseService.saveMemory(cloudMemory);
+          }
+          
+          if (cloudMessages.length > 0) {
+            setMessages(cloudMessages);
+          } else {
+            // First time - show welcome
+            const welcomeMessage: Message = {
+              id: generateId(),
+              role: 'nero',
+              content: "Hey. I'm Nero. I'm here to help you get things done - not by giving you another system, but by actually knowing you. What's on your mind?",
+              timestamp: new Date().toISOString(),
+            };
+            setMessages([welcomeMessage]);
+            await SupabaseService.saveMessage(welcomeMessage);
+          }
+          
           setSyncStatus('synced');
-        } else {
-          // Fall back to local
+        } catch (error) {
+          console.error('Sync failed, using local:', error);
+          setSyncStatus('offline');
           await loadLocalData();
-          setSyncStatus('synced');
         }
       } else {
-        await loadLocalData();
         setSyncStatus('offline');
-      }
-
-      // Schedule next check-in if enabled
-      if (checkinsEnabled) {
-        syncService.scheduleCheckin(checkinInterval);
+        await loadLocalData();
       }
     } catch (error) {
       console.error('Init error:', error);
-      await loadLocalData();
       setSyncStatus('offline');
+      await loadLocalData();
     } finally {
       setIsLoading(false);
     }
@@ -840,357 +816,412 @@ export default function App() {
       AsyncStorage.getItem('@nero/memory'),
     ]);
 
-    if (savedMessages) setMessages(JSON.parse(savedMessages));
-    
+    if (savedMessages) {
+      setMessages(JSON.parse(savedMessages));
+    }
+
     if (savedMemory) {
-      const parsed = JSON.parse(savedMemory);
-      parsed.facts.lastSeen = new Date().toISOString();
-      parsed.facts.totalConversations = (parsed.facts.totalConversations || 0) + 1;
-      setMemory(parsed);
+      const parsedMemory = JSON.parse(savedMemory);
+      parsedMemory.facts.lastSeen = new Date().toISOString();
+      parsedMemory.facts.totalConversations += 1;
+      setMemory(parsedMemory);
     } else {
-      addMessage('nero', "Hey. I'm Nero. I'm here to help you actually do things, not just plan them. What's on your mind?");
+      const welcomeMessage: Message = {
+        id: generateId(),
+        role: 'nero',
+        content: "Hey. I'm Nero. I'm here to help you get things done - not by giving you another system, but by actually knowing you. What's on your mind?",
+        timestamp: new Date().toISOString(),
+      };
+      setMessages([welcomeMessage]);
     }
   };
 
-  const saveData = async () => {
-    try {
-      await Promise.all([
-        AsyncStorage.setItem('@nero/messages', JSON.stringify(messages.slice(-100))),
-        AsyncStorage.setItem('@nero/memory', JSON.stringify(memory)),
-        AsyncStorage.setItem('@nero/geminiKey', JSON.stringify(geminiKey)),
-        AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled)),
-        AsyncStorage.setItem('@nero/checkinsEnabled', JSON.stringify(checkinsEnabled)),
-        AsyncStorage.setItem('@nero/checkinInterval', JSON.stringify(checkinInterval)),
-        AsyncStorage.setItem('@nero/selectedVoice', JSON.stringify(selectedVoice)),
-      ]);
-    } catch (error) {
-      console.error('Save error:', error);
+  // Save settings when they change
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem('@nero/apiKey', JSON.stringify(apiKey));
     }
-  };
+  }, [apiKey, isLoading]);
 
-  const addMessage = useCallback((role: 'user' | 'nero', content: string, isVoice: boolean = false) => {
-    const msg: Message = {
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem('@nero/voiceEnabled', JSON.stringify(voiceEnabled));
+    }
+  }, [voiceEnabled, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem('@nero/autoSpeak', JSON.stringify(autoSpeak));
+    }
+  }, [autoSpeak, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem('@nero/nudgesEnabled', JSON.stringify(nudgesEnabled));
+    }
+  }, [nudgesEnabled, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled));
+    }
+  }, [syncEnabled, isLoading]);
+
+  // Save data locally and to cloud
+  const saveData = useCallback(async (newMessages: Message[], newMemory: UserMemory) => {
+    // Always save locally
+    await Promise.all([
+      AsyncStorage.setItem('@nero/messages', JSON.stringify(newMessages.slice(-100))),
+      AsyncStorage.setItem('@nero/memory', JSON.stringify(newMemory)),
+    ]);
+    
+    // Sync to cloud if enabled
+    if (syncEnabled && SupabaseService.userId) {
+      try {
+        setSyncStatus('syncing');
+        await SupabaseService.saveMemory(newMemory);
+        setSyncStatus('synced');
+      } catch (error) {
+        setSyncStatus('offline');
+      }
+    }
+  }, [syncEnabled]);
+
+  const sendMessage = async (text: string, isVoice: boolean = false) => {
+    if (!text.trim() || isThinking) return;
+
+    const userMessage: Message = {
       id: generateId(),
-      role,
-      content,
+      role: 'user',
+      content: text.trim(),
       timestamp: new Date().toISOString(),
-      isVoice,
     };
-    
-    setMessages(prev => [...prev, msg]);
-    
-    // Sync to cloud
-    if (syncEnabled) {
-      syncService.syncMessage(msg);
-    }
 
-    // Extract memories from user messages
-    if (role === 'user') {
-      const newMems = extractMemories(content);
-      if (newMems.length > 0) {
-        setMemory(prev => {
-          const updated = { ...prev };
-          for (const mem of newMems) {
-            if (mem.startsWith('NAME: ')) {
-              updated.facts.name = mem.replace('NAME: ', '');
-            } else if (mem.startsWith('COMMITMENT: ')) {
-              const c = mem.replace('COMMITMENT: ', '');
-              if (!updated.threads.commitments.includes(c)) {
-                updated.threads.commitments = [...updated.threads.commitments.slice(-4), c];
-              }
-            }
-          }
-          return updated;
-        });
-      }
-      
-      // Reschedule check-in since user is active
-      if (checkinsEnabled) {
-        syncService.scheduleCheckin(checkinInterval);
-      }
-    }
-  }, [syncEnabled, checkinsEnabled, checkinInterval]);
-
-  const sendTextMessage = async () => {
-    const text = input.trim();
-    if (!text || isThinking) return;
-
-    addMessage('user', text);
+    const newMessages = [...messages, userMessage];
+    setMessages(newMessages);
     setInput('');
     setIsThinking(true);
 
-    const response = await callNeroText([...messages, { id: '', role: 'user', content: text, timestamp: '' }], memory, geminiKey);
-    addMessage('nero', response);
-    setIsThinking(false);
-  };
-
-  const startLiveMode = async () => {
-    if (!geminiKey) {
-      alert('Add your Gemini API key in Settings to use live voice.');
-      return;
+    // Save user message to cloud
+    if (syncEnabled && SupabaseService.userId) {
+      await SupabaseService.saveMessage(userMessage);
     }
 
-    setLiveState('connecting');
-    geminiLive.setApiKey(geminiKey);
-    geminiLive.setVoice(selectedVoice);
+    // Extract memories
+    const newMemories = extractMemories(text);
+    let updatedMemory = { ...memory };
     
-    const memoryContext = buildMemoryContext(memory);
-    const connected = await geminiLive.connect(`${NERO_PERSONA}\n\n${memoryContext}`);
-    
-    if (connected) {
-      setIsLiveMode(true);
-      const started = await geminiLive.startListening();
-      if (!started) {
-        setLiveState('idle');
-        setIsLiveMode(false);
+    for (const mem of newMemories) {
+      if (mem.startsWith('NAME: ')) {
+        updatedMemory.facts.name = mem.replace('NAME: ', '');
+      } else if (mem.startsWith('COMMITMENT: ')) {
+        const commitment = mem.replace('COMMITMENT: ', '');
+        if (!updatedMemory.threads.commitments.includes(commitment)) {
+          updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), commitment];
+        }
+      } else if (mem.startsWith('STRUGGLE: ')) {
+        const struggle = mem.replace('STRUGGLE: ', '');
+        if (!updatedMemory.patterns.knownStruggles.some(s => s.includes(struggle.slice(0, 30)))) {
+          updatedMemory.patterns.knownStruggles = [...updatedMemory.patterns.knownStruggles.slice(-4), struggle];
+        }
+      } else {
+        updatedMemory.remembered = [...updatedMemory.remembered.slice(-19), mem];
       }
+    }
+
+    updatedMemory.facts.lastSeen = new Date().toISOString();
+    setMemory(updatedMemory);
+
+    // Get Nero's response
+    const response = await callNero(newMessages, updatedMemory, apiKey, isVoice);
+
+    const neroMessage: Message = {
+      id: generateId(),
+      role: 'nero',
+      content: response,
+      timestamp: new Date().toISOString(),
+    };
+
+    const finalMessages = [...newMessages, neroMessage];
+    setMessages(finalMessages);
+    setIsThinking(false);
+
+    // Save to cloud
+    if (syncEnabled && SupabaseService.userId) {
+      await SupabaseService.saveMessage(neroMessage);
+    }
+
+    // Save locally and to cloud
+    await saveData(finalMessages, updatedMemory);
+
+    // Speak response if voice was used and auto-speak is on
+    if (isVoice && autoSpeak && VoiceService.isSpeechSupported()) {
+      setIsSpeaking(true);
+      VoiceService.speak(response, () => setIsSpeaking(false));
+    }
+  };
+
+  const handleVoicePress = () => {
+    if (isRecording) {
+      VoiceService.stopListening();
+      setIsRecording(false);
+    } else if (isSpeaking) {
+      VoiceService.stopSpeaking();
+      setIsSpeaking(false);
     } else {
-      setLiveState('idle');
-      alert('Could not connect. Check your API key.');
+      if (!VoiceService.isSupported()) {
+        Alert.alert('Voice Not Supported', 'Your browser does not support voice input.');
+        return;
+      }
+      
+      setIsRecording(true);
+      VoiceService.startListening(
+        (transcript) => {
+          setIsRecording(false);
+          if (transcript.trim()) {
+            sendMessage(transcript, true);
+          }
+        },
+        () => setIsRecording(false),
+        (error) => {
+          console.error('Voice error:', error);
+          setIsRecording(false);
+        }
+      );
     }
   };
 
-  const stopLiveMode = () => {
-    geminiLive.disconnect();
-    setIsLiveMode(false);
-    setLiveState('idle');
-    setLiveTranscript('');
+  const dismissNudge = async () => {
+    if (pendingNudge) {
+      await SupabaseService.dismissNudge(pendingNudge.id);
+      setPendingNudge(null);
+    }
   };
 
-  const toggleListening = () => {
-    if (liveState === 'listening') {
-      geminiLive.stopListening();
-    } else if (liveState === 'idle' || liveState === 'speaking') {
-      geminiLive.startListening();
+  const scheduleNudge = async (hours: number) => {
+    const scheduledFor = new Date(Date.now() + hours * 60 * 60 * 1000);
+    const messages = [
+      "Hey, just checking in. How's it going?",
+      "Quick check - how are you doing?",
+      "Thinking of you. What's happening?",
+      "Hey. Where are you at right now?",
+    ];
+    const message = messages[Math.floor(Math.random() * messages.length)];
+    
+    await SupabaseService.createNudge(message, scheduledFor, 'checkin');
+    Alert.alert('Check-in Scheduled', `I'll check in with you in ${hours} hour${hours > 1 ? 's' : ''}.`);
+  };
+
+  const clearHistory = async () => {
+    if (syncEnabled && SupabaseService.userId) {
+      await SupabaseService.clearMessages();
     }
+    
+    const confirmMessage: Message = {
+      id: generateId(),
+      role: 'nero',
+      content: "Starting fresh. I still remember who you are, but our conversation history is cleared. What's on your mind?",
+      timestamp: new Date().toISOString(),
+    };
+    setMessages([confirmMessage]);
+    
+    if (syncEnabled && SupabaseService.userId) {
+      await SupabaseService.saveMessage(confirmMessage);
+    }
+    
+    setShowSettings(false);
   };
 
   // ============ RENDER ============
-
   if (isLoading) {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Connecting...</Text>
       </View>
     );
   }
 
-  // Settings
-  if (showSettings) {
+  // Nudge Popup
+  if (pendingNudge) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.settingsHeader}>
-          <TouchableOpacity onPress={() => setShowSettings(false)}>
-            <Text style={styles.backButton}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.settingsTitle}>Settings</Text>
-          <View style={{ width: 50 }} />
-        </View>
-
-        {/* Tabs */}
-        <View style={styles.tabBar}>
-          {(['general', 'voice', 'sync'] as const).map(tab => (
-            <TouchableOpacity 
-              key={tab} 
-              style={[styles.tab, settingsTab === tab && styles.tabActive]}
-              onPress={() => setSettingsTab(tab)}
-            >
-              <Text style={[styles.tabText, settingsTab === tab && styles.tabTextActive]}>
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <ScrollView style={styles.settingsContent}>
-          {/* General Tab */}
-          {settingsTab === 'general' && (
-            <>
-              <View style={styles.settingsSection}>
-                <Text style={styles.settingsLabel}>Gemini API Key</Text>
-                <Text style={styles.settingsHint}>Required for AI responses</Text>
-                <TextInput
-                  style={styles.settingsInput}
-                  value={geminiKey}
-                  onChangeText={(t) => {
-                    setGeminiKey(t);
-                    geminiLive.setApiKey(t);
-                  }}
-                  placeholder="AIza..."
-                  placeholderTextColor={COLORS.textDim}
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.settingsSection}>
-                <Text style={styles.settingsLabel}>What Nero Knows</Text>
-                {memory.facts.name && <Text style={styles.memoryItem}>• Name: {memory.facts.name}</Text>}
-                <Text style={styles.memoryItem}>• Conversations: {memory.facts.totalConversations}</Text>
-                {memory.threads.commitments.map((c, i) => (
-                  <Text key={i} style={styles.memoryItem}>• Wants to: {c}</Text>
-                ))}
-              </View>
-
-              <View style={styles.settingsSection}>
-                <TouchableOpacity style={styles.dangerButton} onPress={async () => {
-                  await AsyncStorage.clear();
-                  setMessages([]);
-                  setMemory({
-                    facts: { firstSeen: new Date().toISOString(), lastSeen: new Date().toISOString(), totalConversations: 0 },
-                    threads: { commitments: [], openLoops: [] },
-                    patterns: { knownStruggles: [], whatHelps: [] },
-                    remembered: [],
-                  });
-                  setShowSettings(false);
-                  addMessage('nero', "Hey. I'm Nero. Fresh start. What's on your mind?");
-                }}>
-                  <Text style={styles.dangerButtonText}>Reset Everything</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          {/* Voice Tab */}
-          {settingsTab === 'voice' && (
-            <View style={styles.settingsSection}>
-              <Text style={styles.settingsLabel}>Nero's Voice</Text>
-              <Text style={styles.settingsHint}>Choose how Nero sounds in live mode</Text>
-              
-              {VOICE_OPTIONS.map(voice => (
-                <TouchableOpacity
-                  key={voice.id}
-                  style={[styles.voiceOption, selectedVoice === voice.id && styles.voiceOptionSelected]}
-                  onPress={() => {
-                    setSelectedVoice(voice.id);
-                    geminiLive.setVoice(voice.id);
-                  }}
-                >
-                  <View>
-                    <Text style={styles.voiceOptionName}>{voice.name}</Text>
-                    <Text style={styles.voiceOptionDesc}>{voice.description}</Text>
-                  </View>
-                  {selectedVoice === voice.id && (
-                    <Text style={styles.checkmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+        <View style={styles.nudgeContainer}>
+          <View style={styles.nudgeCard}>
+            <Text style={styles.nudgeLabel}>Nero</Text>
+            <Text style={styles.nudgeMessage}>{pendingNudge.message}</Text>
+            <View style={styles.nudgeActions}>
+              <TouchableOpacity 
+                style={styles.nudgeButton} 
+                onPress={dismissNudge}
+              >
+                <Text style={styles.nudgeButtonText}>I'm good</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.nudgeButton, styles.nudgeButtonPrimary]} 
+                onPress={() => {
+                  dismissNudge();
+                  // Could add a default response here
+                }}
+              >
+                <Text style={styles.nudgeButtonTextPrimary}>Let's talk</Text>
+              </TouchableOpacity>
             </View>
-          )}
-
-          {/* Sync Tab */}
-          {settingsTab === 'sync' && (
-            <>
-              <View style={styles.settingsSection}>
-                <View style={styles.syncStatus}>
-                  <View style={[styles.syncDot, { backgroundColor: syncStatus === 'synced' ? COLORS.speaking : syncStatus === 'syncing' ? COLORS.live : COLORS.textDim }]} />
-                  <Text style={styles.syncStatusText}>
-                    {syncStatus === 'synced' ? 'Synced to cloud' : syncStatus === 'syncing' ? 'Syncing...' : 'Offline'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.settingsSection}>
-                <Text style={styles.settingsLabel}>Cloud Sync</Text>
-                <View style={styles.settingRow}>
-                  <View>
-                    <Text style={styles.settingRowText}>Sync across devices</Text>
-                    <Text style={styles.settingRowHint}>Memory and conversations sync to cloud</Text>
-                  </View>
-                  <Switch
-                    value={syncEnabled}
-                    onValueChange={(v) => {
-                      setSyncEnabled(v);
-                      syncService.setSyncEnabled(v);
-                    }}
-                    trackColor={{ false: COLORS.surface, true: COLORS.primary }}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.settingsSection}>
-                <Text style={styles.settingsLabel}>Proactive Check-ins</Text>
-                <View style={styles.settingRow}>
-                  <View>
-                    <Text style={styles.settingRowText}>Nero checks on you</Text>
-                    <Text style={styles.settingRowHint}>Get a message if you've been quiet</Text>
-                  </View>
-                  <Switch
-                    value={checkinsEnabled}
-                    onValueChange={setCheckinsEnabled}
-                    trackColor={{ false: COLORS.surface, true: COLORS.primary }}
-                  />
-                </View>
-                
-                {checkinsEnabled && (
-                  <View style={styles.intervalPicker}>
-                    <Text style={styles.intervalLabel}>Check in every:</Text>
-                    <View style={styles.intervalOptions}>
-                      {[2, 4, 8, 12].map(hours => (
-                        <TouchableOpacity
-                          key={hours}
-                          style={[styles.intervalOption, checkinInterval === hours && styles.intervalOptionSelected]}
-                          onPress={() => setCheckinInterval(hours)}
-                        >
-                          <Text style={[styles.intervalOptionText, checkinInterval === hours && styles.intervalOptionTextSelected]}>
-                            {hours}h
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-        </ScrollView>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
 
-  // Live Voice Mode
-  if (isLiveMode) {
+  // Settings Panel
+  if (showSettings) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
-        <View style={styles.liveContainer}>
-          <Text style={styles.liveStatus}>
-            {liveState === 'connecting' && 'Connecting...'}
-            {liveState === 'listening' && 'Listening...'}
-            {liveState === 'thinking' && 'Thinking...'}
-            {liveState === 'speaking' && 'Speaking...'}
-            {liveState === 'idle' && 'Tap to talk'}
-          </Text>
+        <View style={styles.settingsContainer}>
+          <View style={styles.settingsHeader}>
+            <TouchableOpacity onPress={() => setShowSettings(false)}>
+              <Text style={styles.backButton}>← Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.settingsTitle}>Settings</Text>
+            <View style={{ width: 50 }} />
+          </View>
 
-          {liveTranscript && (
-            <Text style={styles.liveTranscript}>{liveTranscript}</Text>
-          )}
-
-          <TouchableOpacity onPress={toggleListening} disabled={liveState === 'connecting' || liveState === 'thinking'}>
-            <Animated.View style={[
-              styles.liveButton,
-              liveState === 'listening' && styles.liveButtonActive,
-              liveState === 'speaking' && styles.liveButtonSpeaking,
-              { transform: [{ scale: pulseAnim }] }
-            ]}>
-              <Text style={styles.liveButtonIcon}>
-                {liveState === 'listening' ? '🎤' : liveState === 'speaking' ? '🔊' : '🎤'}
-              </Text>
-            </Animated.View>
-          </TouchableOpacity>
-
-          <ScrollView style={styles.liveMessages}>
-            {messages.slice(-6).map(msg => (
-              <View key={msg.id} style={[styles.liveMsgBubble, msg.role === 'user' && styles.liveMsgUser]}>
-                <Text style={styles.liveMsgText}>{msg.content}</Text>
+          <ScrollView style={styles.settingsContent}>
+            {/* Sync Status */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Cloud Sync</Text>
+              <View style={styles.syncRow}>
+                <View style={[styles.syncDot, { 
+                  backgroundColor: syncStatus === 'synced' ? COLORS.accent : 
+                                   syncStatus === 'syncing' ? COLORS.warning : 
+                                   COLORS.textDim 
+                }]} />
+                <Text style={styles.syncText}>
+                  {syncStatus === 'synced' ? 'Synced across devices' :
+                   syncStatus === 'syncing' ? 'Syncing...' :
+                   'Offline mode'}
+                </Text>
               </View>
-            ))}
-          </ScrollView>
+              <TouchableOpacity 
+                style={styles.toggleRow}
+                onPress={() => setSyncEnabled(!syncEnabled)}
+              >
+                <Text style={styles.toggleLabel}>Enable cloud sync</Text>
+                <View style={[styles.toggle, syncEnabled && styles.toggleOn]}>
+                  <View style={[styles.toggleThumb, syncEnabled && styles.toggleThumbOn]} />
+                </View>
+              </TouchableOpacity>
+            </View>
 
-          <TouchableOpacity style={styles.exitButton} onPress={stopLiveMode}>
-            <Text style={styles.exitButtonText}>Exit Voice Mode</Text>
-          </TouchableOpacity>
+            {/* Voice Settings */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Voice</Text>
+              <TouchableOpacity 
+                style={styles.toggleRow}
+                onPress={() => setVoiceEnabled(!voiceEnabled)}
+              >
+                <Text style={styles.toggleLabel}>Enable voice input</Text>
+                <View style={[styles.toggle, voiceEnabled && styles.toggleOn]}>
+                  <View style={[styles.toggleThumb, voiceEnabled && styles.toggleThumbOn]} />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.toggleRow}
+                onPress={() => setAutoSpeak(!autoSpeak)}
+              >
+                <Text style={styles.toggleLabel}>Auto-speak responses</Text>
+                <View style={[styles.toggle, autoSpeak && styles.toggleOn]}>
+                  <View style={[styles.toggleThumb, autoSpeak && styles.toggleThumbOn]} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Nudges */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Check-ins</Text>
+              <TouchableOpacity 
+                style={styles.toggleRow}
+                onPress={() => setNudgesEnabled(!nudgesEnabled)}
+              >
+                <Text style={styles.toggleLabel}>Allow Nero to check in</Text>
+                <View style={[styles.toggle, nudgesEnabled && styles.toggleOn]}>
+                  <View style={[styles.toggleThumb, nudgesEnabled && styles.toggleThumbOn]} />
+                </View>
+              </TouchableOpacity>
+              {nudgesEnabled && syncEnabled && (
+                <View style={styles.nudgeSchedule}>
+                  <Text style={styles.nudgeScheduleLabel}>Schedule a check-in:</Text>
+                  <View style={styles.nudgeButtons}>
+                    <TouchableOpacity style={styles.nudgeTimeBtn} onPress={() => scheduleNudge(1)}>
+                      <Text style={styles.nudgeTimeBtnText}>1h</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.nudgeTimeBtn} onPress={() => scheduleNudge(2)}>
+                      <Text style={styles.nudgeTimeBtnText}>2h</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.nudgeTimeBtn} onPress={() => scheduleNudge(4)}>
+                      <Text style={styles.nudgeTimeBtnText}>4h</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* API Key */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Claude API Key</Text>
+              <Text style={styles.settingsHint}>
+                For smarter responses. Leave empty for basic mode.
+              </Text>
+              <TextInput
+                style={styles.settingsInput}
+                value={apiKey}
+                onChangeText={setApiKey}
+                placeholder="sk-ant-..."
+                placeholderTextColor={COLORS.textDim}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            {/* Memory Info */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>What Nero Remembers</Text>
+              {memory.facts.name && (
+                <Text style={styles.memoryItem}>• Your name: {memory.facts.name}</Text>
+              )}
+              <Text style={styles.memoryItem}>
+                • Conversations: {memory.facts.totalConversations}
+              </Text>
+              {memory.threads.commitments.length > 0 && (
+                <>
+                  <Text style={styles.memorySubhead}>Things you said you'd do:</Text>
+                  {memory.threads.commitments.map((c, i) => (
+                    <Text key={i} style={styles.memoryItem}>• {c}</Text>
+                  ))}
+                </>
+              )}
+              {memory.remembered.length > 0 && (
+                <>
+                  <Text style={styles.memorySubhead}>Other memories:</Text>
+                  {memory.remembered.slice(-5).map((r, i) => (
+                    <Text key={i} style={styles.memoryItem}>• {r}</Text>
+                  ))}
+                </>
+              )}
+            </View>
+
+            {/* Actions */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Data</Text>
+              <TouchableOpacity style={styles.settingsButton} onPress={clearHistory}>
+                <Text style={styles.settingsButtonText}>Clear Conversation History</Text>
+              </TouchableOpacity>
+              <Text style={styles.deviceIdText}>Device: {deviceId.slice(0, 20)}...</Text>
+            </View>
+          </ScrollView>
         </View>
       </SafeAreaView>
     );
@@ -1200,32 +1231,53 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        
+      <KeyboardAvoidingView 
+        style={styles.keyboardView} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>Nero</Text>
-            <View style={[styles.syncIndicator, { backgroundColor: syncStatus === 'synced' ? COLORS.speaking : syncStatus === 'syncing' ? COLORS.live : COLORS.textDim }]} />
+            {syncEnabled && (
+              <View style={[styles.syncIndicator, { 
+                backgroundColor: syncStatus === 'synced' ? COLORS.accent : 
+                                 syncStatus === 'syncing' ? COLORS.warning : 
+                                 COLORS.textDim 
+              }]} />
+            )}
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity onPress={startLiveMode} style={styles.liveIcon}>
-              <Text style={styles.liveIconText}>🎙️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsIcon}>
-              <Text style={styles.settingsIconText}>⚙</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsIcon}>
+            <Text style={styles.settingsIconText}>⚙</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Messages */}
-        <ScrollView ref={scrollRef} style={styles.messagesContainer} contentContainerStyle={styles.messagesContent}>
-          {messages.map((msg) => (
-            <View key={msg.id} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.neroBubble]}>
-              <Text style={styles.messageText}>{msg.content}</Text>
-              {msg.isVoice && <Text style={styles.voiceIndicator}>🎤</Text>}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.messagesContainer}
+          contentContainerStyle={styles.messagesContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          {messages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.messageBubble,
+                message.role === 'user' ? styles.userBubble : styles.neroBubble,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.messageText,
+                  message.role === 'user' ? styles.userText : styles.neroText,
+                ]}
+              >
+                {message.content}
+              </Text>
             </View>
           ))}
+          
           {isThinking && (
             <View style={[styles.messageBubble, styles.neroBubble]}>
               <Text style={styles.thinkingText}>...</Text>
@@ -1235,26 +1287,44 @@ export default function App() {
 
         {/* Input */}
         <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.voiceButton} onPress={startLiveMode}>
-            <Text style={styles.voiceButtonText}>🎙️</Text>
-          </TouchableOpacity>
+          {/* Voice Button */}
+          {voiceEnabled && VoiceService.isSupported() && (
+            <Animated.View style={{ transform: [{ scale: isRecording ? pulseAnim : 1 }] }}>
+              <TouchableOpacity
+                style={[
+                  styles.voiceButton,
+                  isRecording && styles.voiceButtonRecording,
+                  isSpeaking && styles.voiceButtonSpeaking,
+                ]}
+                onPress={handleVoicePress}
+              >
+                <Text style={styles.voiceButtonText}>
+                  {isRecording ? '●' : isSpeaking ? '◼' : '🎤'}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+          
           <TextInput
             style={styles.textInput}
             value={input}
             onChangeText={setInput}
-            placeholder="Talk to Nero..."
+            placeholder={isRecording ? "Listening..." : "Talk to Nero..."}
             placeholderTextColor={COLORS.textDim}
             multiline
+            maxLength={2000}
+            onSubmitEditing={() => sendMessage(input)}
+            blurOnSubmit={false}
+            editable={!isRecording}
           />
           <TouchableOpacity
             style={[styles.sendButton, (!input.trim() || isThinking) && styles.sendButtonDisabled]}
-            onPress={sendTextMessage}
+            onPress={() => sendMessage(input)}
             disabled={!input.trim() || isThinking}
           >
             <Text style={styles.sendButtonText}>↑</Text>
           </TouchableOpacity>
         </View>
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1262,90 +1332,360 @@ export default function App() {
 
 // ============ STYLES ============
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
-  center: { justifyContent: 'center', alignItems: 'center' },
-  keyboardView: { flex: 1 },
-  loadingText: { color: COLORS.textMuted, marginTop: 12 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  loadingText: {
+    color: COLORS.textMuted,
+    marginTop: 12,
+    fontSize: 14,
+  },
   
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle: { fontSize: 20, fontWeight: '600', color: COLORS.text },
-  syncIndicator: { width: 8, height: 8, borderRadius: 4 },
-  headerRight: { flexDirection: 'row', gap: 8 },
-  liveIcon: { padding: 8, backgroundColor: COLORS.live + '20', borderRadius: 20 },
-  liveIconText: { fontSize: 18 },
-  settingsIcon: { padding: 8 },
-  settingsIconText: { fontSize: 20, color: COLORS.textMuted },
+  // Header
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  syncIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  settingsIcon: {
+    padding: 8,
+  },
+  settingsIconText: {
+    fontSize: 20,
+    color: COLORS.textMuted,
+  },
 
-  messagesContainer: { flex: 1 },
-  messagesContent: { padding: 16, paddingBottom: 20 },
-  messageBubble: { maxWidth: '85%', padding: 14, borderRadius: 20, marginBottom: 12, position: 'relative' },
-  neroBubble: { backgroundColor: COLORS.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 6 },
-  userBubble: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 6 },
-  messageText: { fontSize: 16, lineHeight: 22, color: COLORS.text },
-  thinkingText: { color: COLORS.textMuted, fontSize: 18 },
-  voiceIndicator: { position: 'absolute', top: -8, right: -8, fontSize: 12 },
+  // Messages
+  messagesContainer: {
+    flex: 1,
+  },
+  messagesContent: {
+    padding: 16,
+    paddingBottom: 20,
+  },
+  messageBubble: {
+    maxWidth: '85%',
+    padding: 14,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  neroBubble: {
+    backgroundColor: COLORS.surface,
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 6,
+  },
+  userBubble: {
+    backgroundColor: COLORS.primary,
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 6,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  neroText: {
+    color: COLORS.text,
+  },
+  userText: {
+    color: COLORS.text,
+  },
+  thinkingText: {
+    color: COLORS.textMuted,
+    fontSize: 18,
+  },
 
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 12, borderTopWidth: 1, borderTopColor: COLORS.border, gap: 8 },
-  voiceButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.live + '30', justifyContent: 'center', alignItems: 'center' },
-  voiceButtonText: { fontSize: 20 },
-  textInput: { flex: 1, backgroundColor: COLORS.surface, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 12, color: COLORS.text, fontSize: 16, maxHeight: 120, minHeight: 48 },
-  sendButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
-  sendButtonDisabled: { backgroundColor: COLORS.surfaceLight },
-  sendButtonText: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  // Input
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 10,
+  },
+  textInput: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    paddingTop: 12,
+    color: COLORS.text,
+    fontSize: 16,
+    maxHeight: 120,
+    minHeight: 48,
+  },
+  sendButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: COLORS.surfaceLight,
+  },
+  sendButtonText: {
+    color: COLORS.text,
+    fontSize: 22,
+    fontWeight: '600',
+  },
+  
+  // Voice
+  voiceButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.border,
+  },
+  voiceButtonRecording: {
+    backgroundColor: COLORS.recording,
+    borderColor: COLORS.recording,
+  },
+  voiceButtonSpeaking: {
+    backgroundColor: COLORS.accent,
+    borderColor: COLORS.accent,
+  },
+  voiceButtonText: {
+    fontSize: 20,
+  },
 
-  // Live Mode
-  liveContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  liveStatus: { fontSize: 18, color: COLORS.textMuted, marginBottom: 20 },
-  liveTranscript: { fontSize: 16, color: COLORS.text, textAlign: 'center', marginBottom: 30, paddingHorizontal: 20 },
-  liveButton: { width: 120, height: 120, borderRadius: 60, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
-  liveButtonActive: { backgroundColor: COLORS.listening },
-  liveButtonSpeaking: { backgroundColor: COLORS.speaking },
-  liveButtonIcon: { fontSize: 40 },
-  liveMessages: { flex: 1, width: '100%', marginTop: 20 },
-  liveMsgBubble: { backgroundColor: COLORS.surface, padding: 12, borderRadius: 16, marginBottom: 8, alignSelf: 'flex-start', maxWidth: '80%' },
-  liveMsgUser: { alignSelf: 'flex-end', backgroundColor: COLORS.primary + '60' },
-  liveMsgText: { color: COLORS.text, fontSize: 14 },
-  exitButton: { paddingVertical: 16, paddingHorizontal: 32 },
-  exitButtonText: { color: COLORS.textMuted, fontSize: 16 },
+  // Nudge
+  nudgeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  nudgeCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
+  },
+  nudgeLabel: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  nudgeMessage: {
+    color: COLORS.text,
+    fontSize: 20,
+    lineHeight: 28,
+    marginBottom: 24,
+  },
+  nudgeActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  nudgeButton: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: COLORS.surfaceLight,
+    alignItems: 'center',
+  },
+  nudgeButtonPrimary: {
+    backgroundColor: COLORS.primary,
+  },
+  nudgeButtonText: {
+    color: COLORS.textMuted,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  nudgeButtonTextPrimary: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '500',
+  },
 
   // Settings
-  settingsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  backButton: { color: COLORS.primary, fontSize: 16 },
-  settingsTitle: { fontSize: 18, fontWeight: '600', color: COLORS.text },
-  tabBar: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: COLORS.primary },
-  tabText: { color: COLORS.textMuted, fontSize: 14, fontWeight: '500' },
-  tabTextActive: { color: COLORS.primary },
-  settingsContent: { flex: 1, padding: 20 },
-  settingsSection: { marginBottom: 28 },
-  settingsLabel: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  settingsHint: { fontSize: 13, color: COLORS.textDim, marginBottom: 12 },
-  settingsInput: { backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, color: COLORS.text, fontSize: 16 },
-  memoryItem: { color: COLORS.textMuted, fontSize: 14, marginBottom: 6 },
-  dangerButton: { backgroundColor: 'rgba(239, 68, 68, 0.2)', borderRadius: 12, padding: 16, alignItems: 'center' },
-  dangerButtonText: { color: '#ef4444', fontSize: 16 },
-
-  // Voice options
-  voiceOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 8 },
-  voiceOptionSelected: { borderWidth: 2, borderColor: COLORS.primary },
-  voiceOptionName: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
-  voiceOptionDesc: { color: COLORS.textDim, fontSize: 13, marginTop: 2 },
-  checkmark: { color: COLORS.primary, fontSize: 18, fontWeight: '600' },
-
-  // Sync settings
-  syncStatus: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  syncDot: { width: 10, height: 10, borderRadius: 5 },
-  syncStatusText: { color: COLORS.textMuted, fontSize: 14 },
-  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 8 },
-  settingRowText: { color: COLORS.text, fontSize: 16 },
-  settingRowHint: { color: COLORS.textDim, fontSize: 13, marginTop: 2 },
-  intervalPicker: { marginTop: 16 },
-  intervalLabel: { color: COLORS.textMuted, fontSize: 14, marginBottom: 12 },
-  intervalOptions: { flexDirection: 'row', gap: 8 },
-  intervalOption: { flex: 1, backgroundColor: COLORS.surface, borderRadius: 8, padding: 12, alignItems: 'center' },
-  intervalOptionSelected: { backgroundColor: COLORS.primary },
-  intervalOptionText: { color: COLORS.textMuted, fontSize: 14, fontWeight: '500' },
-  intervalOptionTextSelected: { color: COLORS.text },
+  settingsContainer: {
+    flex: 1,
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  backButton: {
+    color: COLORS.primary,
+    fontSize: 16,
+  },
+  settingsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  settingsContent: {
+    flex: 1,
+    padding: 20,
+  },
+  settingsSection: {
+    marginBottom: 32,
+  },
+  settingsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+  },
+  settingsHint: {
+    fontSize: 14,
+    color: COLORS.textDim,
+    marginBottom: 12,
+  },
+  settingsInput: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    color: COLORS.text,
+    fontSize: 16,
+  },
+  settingsButton: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  settingsButtonText: {
+    color: COLORS.text,
+    fontSize: 16,
+  },
+  memoryItem: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginBottom: 6,
+    paddingLeft: 8,
+  },
+  memorySubhead: {
+    color: COLORS.textDim,
+    fontSize: 13,
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  deviceIdText: {
+    color: COLORS.textDim,
+    fontSize: 12,
+    marginTop: 8,
+  },
+  
+  // Sync
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  syncDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  syncText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+  },
+  
+  // Toggle
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  toggleLabel: {
+    color: COLORS.text,
+    fontSize: 16,
+  },
+  toggle: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: COLORS.surfaceLight,
+    padding: 2,
+  },
+  toggleOn: {
+    backgroundColor: COLORS.primary,
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: COLORS.textDim,
+  },
+  toggleThumbOn: {
+    backgroundColor: COLORS.text,
+    transform: [{ translateX: 20 }],
+  },
+  
+  // Nudge Schedule
+  nudgeSchedule: {
+    marginTop: 16,
+  },
+  nudgeScheduleLabel: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  nudgeButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  nudgeTimeBtn: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: COLORS.surface,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  nudgeTimeBtnText: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '500',
+  },
 });
