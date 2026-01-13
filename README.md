@@ -8,29 +8,33 @@ Nero is not a productivity app. Not a to-do list. It's a partner who remembers y
 
 **[nero-app-beryl.vercel.app](https://nero-app-beryl.vercel.app)**
 
-## What's New
+## Features
+
+### 🧠 Pattern Learning (NEW)
+Nero learns what works for YOU:
+- **Energy tracking** - Log how you're feeling and when
+- **Completion patterns** - Tracks when you get things done
+- **Peak time discovery** - Finds your most productive hours
+- **Personalized insights** - "You tend to do well in the mornings"
 
 ### ☁️ Cloud Sync
-- Your conversations and memories sync across all your devices
+- Your conversations and memories sync across all devices
 - Switch from phone to computer seamlessly
-- Everything persists - Nero always remembers
 
 ### 🎤 Voice Input
 - Talk to Nero out loud - no typing needed
 - Nero speaks responses back to you
-- Perfect for when you're moving or can't type
 
 ### ⏰ Check-ins
 - Schedule gentle nudges for later
 - Nero checks in on you (when you want)
-- Not annoying push notifications - respectful check-ins
 
 ## What Makes Nero Different
 
 - **One continuous conversation** - Not sessions or chats. One ongoing relationship.
 - **Real memory** - Nero remembers what you've told it, what you've committed to, what you struggle with.
-- **No features** - No gamification, no dashboards, no complexity. Just talking to someone who knows you.
-- **ADHD-native** - Built by someone with ADHD, for people with ADHD.
+- **Learns YOUR patterns** - Not generic ADHD advice. What works for YOU specifically.
+- **No features** - No gamification, no dashboards. Just talking to someone who knows you.
 
 ## The Philosophy
 
@@ -38,22 +42,14 @@ Most ADHD apps treat ADHD like a knowledge problem. They give you lists, reminde
 
 But ADHD isn't about knowing what to do. It's about doing what you know.
 
-Nero helps you bridge that gap. Not with more information, but with presence.
+Nero helps you bridge that gap. Not with more information, but with presence and understanding.
 
 ## Tech Stack
 
-- React Native / Expo (cross-platform)
+- React Native / Expo
 - Claude AI (Claude Sonnet 4.5)
-- Supabase (cloud sync, persistence)
-- Web Speech API (voice input/output)
-
-## Setup
-
-1. Open the app
-2. (Optional) Add your Claude API key in Settings for smarter responses
-3. Start talking to Nero
-
-Without an API key, Nero still works - just with simpler responses.
+- Supabase (cloud sync, pattern tracking)
+- Web Speech API (voice)
 
 ---
 
