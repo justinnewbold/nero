@@ -102,6 +102,99 @@ interface Nudge {
   type: string;
 }
 
+// ============ NEW FEATURE TYPES ============
+
+// Feature 1: Time Blocking / Schedule Integration
+interface TimeBlock {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  taskId?: string;
+  isRecurring?: boolean;
+  recurringDays?: number[];
+}
+
+// Feature 2: Accountability Partners
+interface AccountabilityPartner {
+  id: string;
+  name: string;
+  email?: string;
+  shareProgress: boolean;
+  weeklyDigest: boolean;
+  lastNotified?: string;
+}
+
+// Feature 3: Task Decomposition
+interface Subtask {
+  id: string;
+  parentTaskId: string;
+  description: string;
+  status: 'open' | 'completed';
+  order: number;
+}
+
+// Feature 4: Emotion/Context Tagging
+interface EnergyContext {
+  id: string;
+  energyLogId?: string;
+  context: string;
+  tags: string[];
+  timestamp: string;
+}
+
+// Feature 8: Waiting Mode Support
+interface WaitingItem {
+  id: string;
+  description: string;
+  waitingFor: string;
+  createdAt: string;
+  expectedBy?: string;
+  status: 'waiting' | 'received' | 'expired';
+  lastCheckedAt?: string;
+}
+
+// Feature 10: Medication/Routine Tracking
+interface MedicationReminder {
+  id: string;
+  name: string;
+  times: string[];
+  days: number[];
+  enabled: boolean;
+  lastTaken?: string;
+}
+
+interface RoutineItem {
+  id: string;
+  name: string;
+  time: string;
+  days: number[];
+  enabled: boolean;
+  streak: number;
+  lastCompleted?: string;
+}
+
+// Feature 9: Weekly/Monthly Reflection
+interface ReflectionData {
+  period: 'week' | 'month';
+  startDate: string;
+  endDate: string;
+  tasksCompleted: number;
+  totalFocusTime: number;
+  avgEnergy: number;
+  topPatterns: string[];
+  wins: string[];
+  struggles: string[];
+}
+
+// Feature 14: Parallel Task Support
+interface ActiveTask {
+  taskId: string;
+  description: string;
+  startedAt: string;
+  status: 'active' | 'paused';
+}
+
 // ============ CONSTANTS ============
 const COLORS = {
   bg: '#0a0a0f',
@@ -125,6 +218,20 @@ const COLORS = {
   complete: '#22c55e',
   delete: '#ef4444',
   quickAdd: '#ec4899',
+  // New feature colors
+  crisis: '#dc2626',
+  calm: '#06b6d4',
+  waiting: '#f59e0b',
+  reflection: '#a855f7',
+  medication: '#14b8a6',
+  motivation: '#f97316',
+  decompose: '#3b82f6',
+  emotion: '#ec4899',
+  transition: '#8b5cf6',
+  hyperfocus: '#eab308',
+  rsd: '#f472b6',
+  parallel: '#06b6d4',
+  celebration: '#fbbf24',
 };
 
 const ENERGY_COLORS = [COLORS.energy1, COLORS.energy2, COLORS.energy3, COLORS.energy4, COLORS.energy5];
@@ -145,6 +252,59 @@ const BODY_DOUBLE_CHECK_INS = [
   "I'm not going anywhere. How's it feel?",
 ];
 
+// Feature 4: Emotion Context Tags
+const EMOTION_TAGS = ['tired', 'stressed', 'anxious', 'overwhelmed', 'sad', 'frustrated', 'unmotivated', 'scattered', 'restless', 'calm', 'hopeful', 'focused'];
+const CONTEXT_TAGS = ['poor sleep', 'work stress', 'relationship', 'health', 'deadline', 'social drain', 'overstimulated', 'understimulated', 'hunger', 'pain', 'meds late', 'meds missed'];
+
+// Feature 6: Hyperfocus Messages
+const HYPERFOCUS_CHECK_INS = [
+  "You've been in deep focus for a while. Remember to drink water.",
+  "Amazing concentration! When did you last stretch?",
+  "Still here. Have you eaten recently?",
+  "Your focus is incredible right now. Quick body check - how are you physically?",
+  "3 hours deep! Consider a 5-minute break for your eyes.",
+];
+
+// Feature 7: RSD Support Messages
+const RSD_SUPPORT_MESSAGES = [
+  "That sounds like it hit hard. Want to talk through it?",
+  "It's okay to feel this way. The feeling is real even if the story isn't.",
+  "Sometimes our brains make feedback feel bigger than it is. What actually happened?",
+  "That stings. Let's separate what was said from what you're feeling.",
+];
+
+// Feature 11: External Motivation Prompts
+const MOTIVATION_PROMPTS = [
+  "One tiny step. What's the smallest thing you could do in 2 minutes?",
+  "Let's make it easy. What would take almost no effort?",
+  "Quick win time. What's something simple you could knock out?",
+  "No pressure mode. Pick anything - even getting a glass of water counts.",
+];
+
+// Feature 12: Sensory Environment Options
+const SENSORY_OPTIONS = {
+  lighting: ['dim', 'bright', 'natural', 'warm'],
+  sound: ['silence', 'white noise', 'music', 'ambient', 'nature sounds'],
+  movement: ['sitting', 'standing', 'walking', 'fidgeting'],
+  temperature: ['cool', 'warm', 'neutral'],
+};
+
+// Feature 15: Crisis Mode Breathing
+const BREATHING_PATTERNS = {
+  calm: { inhale: 4, hold: 4, exhale: 4 },
+  ground: { inhale: 4, hold: 7, exhale: 8 },
+  quick: { inhale: 2, hold: 2, exhale: 4 },
+};
+
+// Feature 13: Celebration Messages
+const CELEBRATION_MESSAGES = [
+  "Look at everything you did today!",
+  "These wins matter. Every single one.",
+  "You showed up. That's huge.",
+  "Progress, not perfection. And you made progress.",
+  "Your effort counts even when it doesn't feel like it.",
+];
+
 const NERO_SYSTEM_PROMPT = `You are Nero, an AI companion for someone with ADHD. Warm, direct, no judgment.
 
 RULES:
@@ -152,13 +312,35 @@ RULES:
 - No bullet points or lists.
 - Casual like a friend.
 - When in body doubling mode, be a calm presence.
+- Detect emotional distress and RSD (rejection sensitive dysphoria) signals.
+- Notice when someone seems overwhelmed and offer crisis support.
+- Help break down tasks when they feel too big.
 
 BODY DOUBLING MODE:
 When active, you're just there. Like a friend sitting nearby while they work.
 - Don't over-check
 - Celebrate small wins
 - If they seem stuck, gently ask what's blocking them
-- Never guilt or pressure`;
+- Never guilt or pressure
+
+CRISIS MODE:
+When someone is overwhelmed or in emotional distress:
+- Be calm and grounding
+- Focus on breathing and the present moment
+- Everything else can wait
+- No productivity pressure
+
+RSD SUPPORT:
+When detecting rejection sensitivity:
+- Validate the feeling without amplifying it
+- Help separate emotion from facts
+- Gently reality-check without dismissing
+
+TASK DECOMPOSITION:
+When a task feels too big:
+- Ask "What's the first tiny step?"
+- Break it down until it feels doable
+- One piece at a time`;
 
 // ============ HELPERS ============
 const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
@@ -193,6 +375,106 @@ const formatDurationShort = (ms: number) => {
 };
 
 const getTaskAge = (timestamp: string): number => (Date.now() - new Date(timestamp).getTime()) / (1000 * 60 * 60 * 24);
+
+// Feature 6: Hyperfocus Detection
+const detectHyperfocus = (sessionStartTime: string): { isHyperfocusing: boolean; duration: number } => {
+  const duration = Date.now() - new Date(sessionStartTime).getTime();
+  const hours = duration / (1000 * 60 * 60);
+  return { isHyperfocusing: hours >= 2, duration };
+};
+
+// Feature 7: RSD Detection
+const detectRSD = (message: string): boolean => {
+  const rsdPatterns = [
+    /they hate me/i, /i'm terrible/i, /i ruined/i, /everyone thinks/i,
+    /i can't do anything right/i, /they're mad at me/i, /i'm a failure/i,
+    /nobody likes me/i, /i messed up/i, /i'm so stupid/i, /rejected/i,
+    /they don't want me/i, /i'm not good enough/i, /i disappointed/i,
+  ];
+  return rsdPatterns.some(p => p.test(message));
+};
+
+// Feature 15: Crisis Detection
+const detectCrisis = (message: string): boolean => {
+  const crisisPatterns = [
+    /i can't do this/i, /overwhelmed/i, /falling apart/i, /too much/i,
+    /can't breathe/i, /panicking/i, /shutting down/i, /everything is wrong/i,
+    /i give up/i, /i can't cope/i, /meltdown/i, /breaking down/i,
+  ];
+  return crisisPatterns.some(p => p.test(message));
+};
+
+// Feature 5: Transition Detection
+const needsTransitionSupport = (sessionDuration: number, checkInCount: number): boolean => {
+  const hours = sessionDuration / (1000 * 60 * 60);
+  return hours >= 1 && checkInCount >= 3;
+};
+
+// Feature 13: Generate Done List Message
+const generateDoneListMessage = (completed: Task[], focusTime: number, name?: string): string => {
+  const greeting = name ? `${name}, ` : '';
+  const intro = CELEBRATION_MESSAGES[Math.floor(Math.random() * CELEBRATION_MESSAGES.length)];
+
+  let message = `${greeting}${intro}\n\n`;
+
+  if (completed.length > 0) {
+    message += `Today you completed:\n`;
+    completed.slice(0, 5).forEach(t => { message += `• ${t.description}\n`; });
+    if (completed.length > 5) message += `• ...and ${completed.length - 5} more!\n`;
+  }
+
+  if (focusTime > 0) {
+    message += `\nFocus time: ${formatDuration(focusTime)}`;
+  }
+
+  if (completed.length === 0 && focusTime === 0) {
+    message = `${greeting}You showed up today. That counts. Tomorrow is a new day.`;
+  }
+
+  return message;
+};
+
+// Feature 1: Check upcoming time blocks
+const getUpcomingTimeBlock = (blocks: TimeBlock[]): TimeBlock | null => {
+  const now = new Date();
+  const today = now.getDay();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  for (const block of blocks) {
+    const [hours, mins] = block.startTime.split(':').map(Number);
+    const blockTime = hours * 60 + mins;
+    const timeDiff = blockTime - currentTime;
+
+    if (block.isRecurring && block.recurringDays && !block.recurringDays.includes(today)) continue;
+
+    if (timeDiff > 0 && timeDiff <= 30) return block;
+  }
+  return null;
+};
+
+// Feature 9: Weekly Stats Summary
+const generateWeeklyInsight = (data: ReflectionData): string => {
+  const insights: string[] = [];
+
+  if (data.tasksCompleted > 0) {
+    insights.push(`You completed ${data.tasksCompleted} task${data.tasksCompleted > 1 ? 's' : ''} this ${data.period}.`);
+  }
+
+  if (data.totalFocusTime > 0) {
+    insights.push(`${formatDuration(data.totalFocusTime)} of focused work.`);
+  }
+
+  if (data.avgEnergy > 0) {
+    const energyWord = data.avgEnergy >= 4 ? 'good' : data.avgEnergy >= 3 ? 'okay' : 'challenging';
+    insights.push(`Average energy was ${energyWord} (${data.avgEnergy}/5).`);
+  }
+
+  if (data.wins.length > 0) {
+    insights.push(`Biggest wins: ${data.wins.slice(0, 3).join(', ')}`);
+  }
+
+  return insights.join(' ');
+};
 
 // ============ FOCUS ANALYTICS ENGINE ============
 const FocusAnalytics = {
@@ -531,6 +813,153 @@ const SupabaseService = {
   async markNudgeSent(nudgeId: string): Promise<void> { await supabase.from('nero_nudges').update({ sent_at: new Date().toISOString() }).eq('id', nudgeId); },
   async dismissNudge(nudgeId: string): Promise<void> { await supabase.from('nero_nudges').update({ dismissed_at: new Date().toISOString() }).eq('id', nudgeId); },
   async clearMessages(): Promise<void> { if (!this.userId) return; await supabase.from('nero_messages').delete().eq('user_id', this.userId); },
+
+  // Feature 1: Time Blocks
+  async getTimeBlocks(): Promise<TimeBlock[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_time_blocks').select('*').eq('user_id', this.userId).order('start_time', { ascending: true });
+    return (data || []).map(t => ({ id: t.id, title: t.title, startTime: t.start_time, endTime: t.end_time, taskId: t.task_id, isRecurring: t.is_recurring, recurringDays: t.recurring_days }));
+  },
+
+  async saveTimeBlock(block: TimeBlock): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_time_blocks').upsert({ id: block.id, user_id: this.userId, title: block.title, start_time: block.startTime, end_time: block.endTime, task_id: block.taskId, is_recurring: block.isRecurring, recurring_days: block.recurringDays });
+  },
+
+  async deleteTimeBlock(blockId: string): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_time_blocks').delete().eq('id', blockId);
+  },
+
+  // Feature 3: Subtasks
+  async getSubtasks(parentTaskId: string): Promise<Subtask[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_subtasks').select('*').eq('parent_task_id', parentTaskId).order('order_num', { ascending: true });
+    return (data || []).map(s => ({ id: s.id, parentTaskId: s.parent_task_id, description: s.description, status: s.status, order: s.order_num }));
+  },
+
+  async saveSubtask(subtask: Subtask): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_subtasks').upsert({ id: subtask.id, user_id: this.userId, parent_task_id: subtask.parentTaskId, description: subtask.description, status: subtask.status, order_num: subtask.order });
+  },
+
+  async completeSubtask(subtaskId: string): Promise<void> {
+    await supabase.from('nero_subtasks').update({ status: 'completed' }).eq('id', subtaskId);
+  },
+
+  // Feature 4: Emotion Context
+  async logEnergyContext(context: EnergyContext): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_energy_context').insert({ id: context.id, user_id: this.userId, energy_log_id: context.energyLogId, context: context.context, tags: context.tags, created_at: context.timestamp });
+  },
+
+  async getEnergyContexts(days: number = 14): Promise<EnergyContext[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_energy_context').select('*').eq('user_id', this.userId).gte('created_at', since).order('created_at', { ascending: false });
+    return (data || []).map(c => ({ id: c.id, energyLogId: c.energy_log_id, context: c.context, tags: c.tags || [], timestamp: c.created_at }));
+  },
+
+  // Feature 8: Waiting Items
+  async getWaitingItems(): Promise<WaitingItem[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_waiting_items').select('*').eq('user_id', this.userId).eq('status', 'waiting').order('created_at', { ascending: true });
+    return (data || []).map(w => ({ id: w.id, description: w.description, waitingFor: w.waiting_for, createdAt: w.created_at, expectedBy: w.expected_by, status: w.status, lastCheckedAt: w.last_checked_at }));
+  },
+
+  async saveWaitingItem(item: WaitingItem): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_waiting_items').upsert({ id: item.id, user_id: this.userId, description: item.description, waiting_for: item.waitingFor, created_at: item.createdAt, expected_by: item.expectedBy, status: item.status, last_checked_at: item.lastCheckedAt });
+  },
+
+  async updateWaitingItemStatus(itemId: string, status: 'waiting' | 'received' | 'expired'): Promise<void> {
+    await supabase.from('nero_waiting_items').update({ status, last_checked_at: new Date().toISOString() }).eq('id', itemId);
+  },
+
+  // Feature 10: Medication Reminders
+  async getMedicationReminders(): Promise<MedicationReminder[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_medication_reminders').select('*').eq('user_id', this.userId).eq('enabled', true);
+    return (data || []).map(m => ({ id: m.id, name: m.name, times: m.times || [], days: m.days || [0,1,2,3,4,5,6], enabled: m.enabled, lastTaken: m.last_taken }));
+  },
+
+  async saveMedicationReminder(reminder: MedicationReminder): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_medication_reminders').upsert({ id: reminder.id, user_id: this.userId, name: reminder.name, times: reminder.times, days: reminder.days, enabled: reminder.enabled, last_taken: reminder.lastTaken });
+  },
+
+  async markMedicationTaken(reminderId: string): Promise<void> {
+    await supabase.from('nero_medication_reminders').update({ last_taken: new Date().toISOString() }).eq('id', reminderId);
+  },
+
+  // Feature 10: Routines
+  async getRoutines(): Promise<RoutineItem[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_routines').select('*').eq('user_id', this.userId).eq('enabled', true);
+    return (data || []).map(r => ({ id: r.id, name: r.name, time: r.time, days: r.days || [0,1,2,3,4,5,6], enabled: r.enabled, streak: r.streak || 0, lastCompleted: r.last_completed }));
+  },
+
+  async saveRoutine(routine: RoutineItem): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_routines').upsert({ id: routine.id, user_id: this.userId, name: routine.name, time: routine.time, days: routine.days, enabled: routine.enabled, streak: routine.streak, last_completed: routine.lastCompleted });
+  },
+
+  async markRoutineCompleted(routineId: string, streak: number): Promise<void> {
+    await supabase.from('nero_routines').update({ last_completed: new Date().toISOString(), streak }).eq('id', routineId);
+  },
+
+  // Feature 9: Reflection Data
+  async getReflectionData(period: 'week' | 'month'): Promise<ReflectionData | null> {
+    if (!this.userId) return null;
+    const now = new Date();
+    const days = period === 'week' ? 7 : 30;
+    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const [tasksData, energyData, focusData] = await Promise.all([
+      supabase.from('nero_tasks').select('*').eq('user_id', this.userId).eq('status', 'completed').gte('completed_at', startDate.toISOString()),
+      supabase.from('nero_energy_logs').select('*').eq('user_id', this.userId).gte('created_at', startDate.toISOString()),
+      supabase.from('nero_focus_sessions').select('*').eq('user_id', this.userId).gte('started_at', startDate.toISOString()),
+    ]);
+
+    const completedTasks = tasksData.data || [];
+    const energyLogs = energyData.data || [];
+    const sessions = focusData.data || [];
+
+    const avgEnergy = energyLogs.length > 0 ? energyLogs.reduce((sum, e) => sum + e.energy_level, 0) / energyLogs.length : 0;
+    const totalFocusTime = sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0);
+
+    return {
+      period,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      tasksCompleted: completedTasks.length,
+      totalFocusTime,
+      avgEnergy: Math.round(avgEnergy * 10) / 10,
+      topPatterns: [],
+      wins: completedTasks.slice(0, 5).map(t => t.description),
+      struggles: [],
+    };
+  },
+
+  // Feature 14: Active/Parallel Tasks
+  async getActiveTasks(): Promise<ActiveTask[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_active_tasks').select('*').eq('user_id', this.userId).order('started_at', { ascending: false });
+    return (data || []).map(t => ({ taskId: t.task_id, description: t.description, startedAt: t.started_at, status: t.status }));
+  },
+
+  async setTaskActive(taskId: string, description: string): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_active_tasks').upsert({ task_id: taskId, user_id: this.userId, description, started_at: new Date().toISOString(), status: 'active' });
+  },
+
+  async pauseTask(taskId: string): Promise<void> {
+    await supabase.from('nero_active_tasks').update({ status: 'paused' }).eq('task_id', taskId);
+  },
+
+  async removeActiveTask(taskId: string): Promise<void> {
+    await supabase.from('nero_active_tasks').delete().eq('task_id', taskId);
+  },
 };
 
 // ============ AI SERVICE ============
@@ -755,7 +1184,77 @@ export default function App() {
   
   // Quick Add
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  
+
+  // ============ NEW FEATURE STATES ============
+
+  // Feature 1: Time Blocking
+  const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
+  const [showTimeBlocks, setShowTimeBlocks] = useState(false);
+  const [upcomingBlock, setUpcomingBlock] = useState<TimeBlock | null>(null);
+
+  // Feature 2: Accountability Partners (local only for now)
+  const [accountabilityPartner, setAccountabilityPartner] = useState<AccountabilityPartner | null>(null);
+
+  // Feature 3: Task Decomposition
+  const [showDecompose, setShowDecompose] = useState(false);
+  const [decomposeTask, setDecomposeTask] = useState<Task | null>(null);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+
+  // Feature 4: Emotion/Context Tagging
+  const [showEmotionTag, setShowEmotionTag] = useState(false);
+  const [selectedEmotionTags, setSelectedEmotionTags] = useState<string[]>([]);
+  const [selectedContextTags, setSelectedContextTags] = useState<string[]>([]);
+  const [energyContexts, setEnergyContexts] = useState<EnergyContext[]>([]);
+
+  // Feature 5: Transition Support
+  const [showTransitionSupport, setShowTransitionSupport] = useState(false);
+
+  // Feature 6: Hyperfocus Detection
+  const [hyperfocusWarning, setHyperfocusWarning] = useState(false);
+  const [lastHyperfocusCheck, setLastHyperfocusCheck] = useState<string | null>(null);
+
+  // Feature 7: RSD Support
+  const [showRSDSupport, setShowRSDSupport] = useState(false);
+  const [rsdTriggerMessage, setRsdTriggerMessage] = useState('');
+
+  // Feature 8: Waiting Mode
+  const [waitingItems, setWaitingItems] = useState<WaitingItem[]>([]);
+  const [showWaitingMode, setShowWaitingMode] = useState(false);
+  const [showAddWaiting, setShowAddWaiting] = useState(false);
+
+  // Feature 9: Reflection
+  const [showReflection, setShowReflection] = useState(false);
+  const [reflectionData, setReflectionData] = useState<ReflectionData | null>(null);
+
+  // Feature 10: Medication/Routine
+  const [medicationReminders, setMedicationReminders] = useState<MedicationReminder[]>([]);
+  const [routines, setRoutines] = useState<RoutineItem[]>([]);
+  const [showMedReminder, setShowMedReminder] = useState(false);
+  const [pendingMedReminder, setPendingMedReminder] = useState<MedicationReminder | null>(null);
+
+  // Feature 11: External Motivation Mode
+  const [externalMotivationMode, setExternalMotivationMode] = useState(false);
+  const [motivationInterval, setMotivationInterval] = useState<NodeJS.Timeout | null>(null);
+  const [currentMotivationPrompt, setCurrentMotivationPrompt] = useState('');
+
+  // Feature 12: Sensory Environment
+  const [showSensoryCheck, setShowSensoryCheck] = useState(false);
+  const [currentSensorySettings, setCurrentSensorySettings] = useState<{lighting?: string; sound?: string; movement?: string}>({});
+
+  // Feature 13: Done List Celebration
+  const [showDoneList, setShowDoneList] = useState(false);
+  const [todayCompletedTasks, setTodayCompletedTasks] = useState<Task[]>([]);
+  const [todayFocusTime, setTodayFocusTime] = useState(0);
+
+  // Feature 14: Parallel Tasks
+  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+  const [showParallelTasks, setShowParallelTasks] = useState(false);
+
+  // Feature 15: Crisis/Meltdown Mode
+  const [crisisMode, setCrisisMode] = useState(false);
+  const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
+  const [breathingCount, setBreathingCount] = useState(0);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
   const fabAnim = useRef(new Animated.Value(1)).current;
@@ -845,6 +1344,97 @@ export default function App() {
     }
   }, [focusSessions]);
 
+  // Feature 6: Hyperfocus Detection
+  useEffect(() => {
+    if (bodyDoubleMode && bodyDoubleSession) {
+      const checkHyperfocus = setInterval(() => {
+        const { isHyperfocusing, duration } = detectHyperfocus(bodyDoubleSession.startedAt);
+        const hoursSinceLastCheck = lastHyperfocusCheck ? (Date.now() - new Date(lastHyperfocusCheck).getTime()) / 3600000 : 999;
+
+        if (isHyperfocusing && hoursSinceLastCheck >= 1 && !hyperfocusWarning) {
+          setHyperfocusWarning(true);
+          setLastHyperfocusCheck(new Date().toISOString());
+        }
+      }, 60000);
+      return () => clearInterval(checkHyperfocus);
+    }
+  }, [bodyDoubleMode, bodyDoubleSession, lastHyperfocusCheck, hyperfocusWarning]);
+
+  // Feature 1: Time Block Notifications
+  useEffect(() => {
+    if (timeBlocks.length > 0) {
+      const checkBlocks = setInterval(() => {
+        const upcoming = getUpcomingTimeBlock(timeBlocks);
+        if (upcoming && (!upcomingBlock || upcoming.id !== upcomingBlock.id)) {
+          setUpcomingBlock(upcoming);
+        }
+      }, 60000);
+      return () => clearInterval(checkBlocks);
+    }
+  }, [timeBlocks, upcomingBlock]);
+
+  // Feature 10: Medication Reminder Check
+  useEffect(() => {
+    if (medicationReminders.length > 0) {
+      const checkMeds = setInterval(() => {
+        const now = new Date();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const today = now.getDay();
+
+        for (const reminder of medicationReminders) {
+          if (!reminder.enabled || !reminder.days.includes(today)) continue;
+
+          for (const time of reminder.times) {
+            const [h, m] = time.split(':');
+            const reminderTime = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+
+            if (currentTime === reminderTime) {
+              const lastTaken = reminder.lastTaken ? new Date(reminder.lastTaken) : null;
+              const alreadyTakenToday = lastTaken && lastTaken.toDateString() === now.toDateString();
+
+              if (!alreadyTakenToday && !pendingMedReminder) {
+                setPendingMedReminder(reminder);
+                setShowMedReminder(true);
+              }
+            }
+          }
+        }
+      }, 60000);
+      return () => clearInterval(checkMeds);
+    }
+  }, [medicationReminders, pendingMedReminder]);
+
+  // Feature 11: External Motivation Mode
+  useEffect(() => {
+    if (externalMotivationMode) {
+      const prompt = MOTIVATION_PROMPTS[Math.floor(Math.random() * MOTIVATION_PROMPTS.length)];
+      setCurrentMotivationPrompt(prompt);
+
+      const interval = setInterval(() => {
+        const newPrompt = MOTIVATION_PROMPTS[Math.floor(Math.random() * MOTIVATION_PROMPTS.length)];
+        setCurrentMotivationPrompt(newPrompt);
+        if (Platform.OS !== 'web') Vibration.vibrate(100);
+      }, 10 * 60 * 1000); // Every 10 minutes
+
+      setMotivationInterval(interval);
+      return () => clearInterval(interval);
+    } else {
+      if (motivationInterval) clearInterval(motivationInterval);
+      setCurrentMotivationPrompt('');
+    }
+  }, [externalMotivationMode]);
+
+  // Feature 13: Calculate today's completed tasks for Done List
+  useEffect(() => {
+    const today = new Date().setHours(0, 0, 0, 0);
+    const todayTasks = completedTasks.filter(t => t.completedAt && new Date(t.completedAt).setHours(0, 0, 0, 0) === today);
+    setTodayCompletedTasks(todayTasks);
+
+    const todaySessions = focusSessions.filter(s => new Date(s.endedAt).setHours(0, 0, 0, 0) === today);
+    const totalTime = todaySessions.reduce((sum, s) => sum + s.durationMs, 0);
+    setTodayFocusTime(totalTime);
+  }, [completedTasks, focusSessions]);
+
   const initializeApp = async () => {
     try {
       let storedDeviceId = await AsyncStorage.getItem('@nero/deviceId');
@@ -869,9 +1459,11 @@ export default function App() {
         try {
           setSyncStatus('syncing');
           await SupabaseService.initialize(storedDeviceId);
-          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions] = await Promise.all([
+          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions, cloudTimeBlocks, cloudWaiting, cloudMeds, cloudRoutines, cloudContexts] = await Promise.all([
             SupabaseService.getMemory(), SupabaseService.getMessages(100), SupabaseService.getPatterns(),
             SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30), SupabaseService.getFocusSessions(30),
+            SupabaseService.getTimeBlocks(), SupabaseService.getWaitingItems(), SupabaseService.getMedicationReminders(),
+            SupabaseService.getRoutines(), SupabaseService.getEnergyContexts(14),
           ]);
           if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
           if (cloudMessages.length > 0) setMessages(cloudMessages);
@@ -881,6 +1473,8 @@ export default function App() {
             await SupabaseService.saveMessage(welcome);
           }
           setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted); setFocusSessions(cloudSessions);
+          setTimeBlocks(cloudTimeBlocks); setWaitingItems(cloudWaiting); setMedicationReminders(cloudMeds);
+          setRoutines(cloudRoutines); setEnergyContexts(cloudContexts);
           SupabaseService.analyzePatterns();
           setSyncStatus('synced');
         } catch { setSyncStatus('offline'); await loadLocalData(); }
@@ -910,17 +1504,31 @@ export default function App() {
     if (syncEnabled && SupabaseService.userId) { try { setSyncStatus('syncing'); await SupabaseService.saveMemory(newMemory); setSyncStatus('synced'); } catch { setSyncStatus('offline'); } }
   }, [syncEnabled]);
 
-  const handleEnergySubmit = async (level: number, mood: string) => {
+  const handleEnergySubmit = async (level: number, mood: string, skipContext: boolean = false) => {
     setCurrentEnergy(level);
     setShowEnergyCheck(false);
     const now = new Date().toISOString();
     setLastEnergyCheck(now);
     await AsyncStorage.setItem('@nero/lastEnergyCheck', now);
     if (syncEnabled && SupabaseService.userId) await SupabaseService.logEnergy(level, mood);
-    
+
+    // Feature 4: Show emotion/context tagging for low energy
+    if (level <= 2 && !skipContext) {
+      setShowEmotionTag(true);
+      return;
+    }
+
     const suggestion = TaskSuggestionEngine.suggestTask(openTasks, level, patterns, completedTasks);
     setTaskSuggestion(suggestion);
     setSuggestionMessage(TaskSuggestionEngine.generateSuggestionMessage(suggestion, level, memory.facts.name));
+    setShowTaskSuggestion(true);
+  };
+
+  const handleEmotionTagComplete = () => {
+    handleEmotionSubmit();
+    const suggestion = TaskSuggestionEngine.suggestTask(openTasks, currentEnergy || 2, patterns, completedTasks);
+    setTaskSuggestion(suggestion);
+    setSuggestionMessage(TaskSuggestionEngine.generateSuggestionMessage(suggestion, currentEnergy || 2, memory.facts.name));
     setShowTaskSuggestion(true);
   };
 
@@ -998,6 +1606,11 @@ export default function App() {
   const endBodyDoubleMode = async (completed: boolean = false) => {
     const endTime = new Date().toISOString();
     const duration = bodyDoubleSession ? Date.now() - new Date(bodyDoubleSession.startedAt).getTime() : 0;
+
+    // Feature 5: Check if transition support is needed
+    if (bodyDoubleSession && needsTransitionSupport(duration, bodyDoubleSession.checkInCount)) {
+      setShowTransitionSupport(true);
+    }
 
     // Save focus session
     if (bodyDoubleSession && syncEnabled && SupabaseService.userId) {
@@ -1088,6 +1701,21 @@ export default function App() {
 
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(userMessage);
 
+    // Feature 15: Crisis Detection
+    if (detectCrisis(text) && !crisisMode) {
+      setIsThinking(false);
+      enterCrisisMode();
+      return;
+    }
+
+    // Feature 7: RSD Detection
+    if (detectRSD(text) && !showRSDSupport) {
+      setRsdTriggerMessage(text);
+      setShowRSDSupport(true);
+      setIsThinking(false);
+      return;
+    }
+
     if (bodyDoubleMode && bodyDoubleSession) {
       setBodyDoubleSession({ ...bodyDoubleSession, lastCheckIn: new Date().toISOString() });
     }
@@ -1151,6 +1779,235 @@ export default function App() {
   };
 
   const dismissNudge = async () => { if (pendingNudge) { await SupabaseService.dismissNudge(pendingNudge.id); setPendingNudge(null); } };
+
+  // ============ NEW FEATURE HANDLERS ============
+
+  // Feature 3: Task Decomposition
+  const startDecompose = (task: Task) => {
+    setDecomposeTask(task);
+    setSubtasks([]);
+    setShowDecompose(true);
+  };
+
+  const addSubtask = async (description: string) => {
+    if (!decomposeTask) return;
+    const subtask: Subtask = {
+      id: generateId(),
+      parentTaskId: decomposeTask.id,
+      description,
+      status: 'open',
+      order: subtasks.length,
+    };
+    setSubtasks(prev => [...prev, subtask]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveSubtask(subtask);
+  };
+
+  const completeSubtask = async (subtaskId: string) => {
+    setSubtasks(prev => prev.map(s => s.id === subtaskId ? { ...s, status: 'completed' } : s));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.completeSubtask(subtaskId);
+  };
+
+  // Feature 4: Emotion/Context Tagging
+  const handleEmotionSubmit = async () => {
+    if (!currentEnergy) return;
+    const context: EnergyContext = {
+      id: generateId(),
+      context: [...selectedEmotionTags, ...selectedContextTags].join(', '),
+      tags: [...selectedEmotionTags, ...selectedContextTags],
+      timestamp: new Date().toISOString(),
+    };
+    setEnergyContexts(prev => [context, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.logEnergyContext(context);
+    setShowEmotionTag(false);
+    setSelectedEmotionTags([]);
+    setSelectedContextTags([]);
+  };
+
+  const toggleEmotionTag = (tag: string) => {
+    setSelectedEmotionTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const toggleContextTag = (tag: string) => {
+    setSelectedContextTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  // Feature 5: Transition Support
+  const handleTransitionEnd = async () => {
+    setShowTransitionSupport(false);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: "Take a moment. Stretch, breathe, maybe grab some water. The next thing can wait a minute.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 6: Hyperfocus Warning Response
+  const handleHyperfocusResponse = async (action: 'continue' | 'break' | 'end') => {
+    setHyperfocusWarning(false);
+    let content = '';
+
+    if (action === 'continue') {
+      content = "Alright, keep going! I'll check in again later. Remember to hydrate.";
+    } else if (action === 'break') {
+      content = "Smart. Take 5-10 minutes. Move around, drink water, rest your eyes. I'll be here.";
+    } else {
+      await endBodyDoubleMode(true);
+      return;
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 7: RSD Support
+  const handleRSDSupport = async (action: 'talk' | 'reframe' | 'dismiss') => {
+    setShowRSDSupport(false);
+    let content = '';
+
+    if (action === 'talk') {
+      content = "I'm here. Tell me what happened - just the facts first, then how you're feeling.";
+    } else if (action === 'reframe') {
+      content = "Let's reality-check this together. What actually happened vs what your brain is telling you?";
+    } else {
+      content = "That's okay. The feeling will pass. I'm here if you want to talk later.";
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    setRsdTriggerMessage('');
+  };
+
+  // Feature 8: Waiting Mode
+  const addWaitingItem = async (description: string, waitingFor: string, expectedBy?: string) => {
+    const item: WaitingItem = {
+      id: generateId(),
+      description,
+      waitingFor,
+      createdAt: new Date().toISOString(),
+      expectedBy,
+      status: 'waiting',
+    };
+    setWaitingItems(prev => [...prev, item]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveWaitingItem(item);
+    setShowAddWaiting(false);
+  };
+
+  const resolveWaitingItem = async (itemId: string, received: boolean) => {
+    const status = received ? 'received' : 'expired';
+    setWaitingItems(prev => prev.filter(w => w.id !== itemId));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.updateWaitingItemStatus(itemId, status);
+  };
+
+  // Feature 9: Reflection
+  const loadReflection = async (period: 'week' | 'month') => {
+    if (syncEnabled && SupabaseService.userId) {
+      const data = await SupabaseService.getReflectionData(period);
+      setReflectionData(data);
+      setShowReflection(true);
+    }
+  };
+
+  // Feature 10: Medication Reminder Response
+  const handleMedReminderResponse = async (taken: boolean) => {
+    if (pendingMedReminder && taken && syncEnabled && SupabaseService.userId) {
+      await SupabaseService.markMedicationTaken(pendingMedReminder.id);
+    }
+    setShowMedReminder(false);
+    setPendingMedReminder(null);
+  };
+
+  // Feature 11: External Motivation Toggle
+  const toggleExternalMotivation = () => {
+    setExternalMotivationMode(prev => !prev);
+  };
+
+  // Feature 12: Sensory Environment
+  const handleSensorySubmit = async () => {
+    setShowSensoryCheck(false);
+    const settings = Object.entries(currentSensorySettings).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ');
+    if (settings) {
+      const neroMessage: Message = {
+        id: generateId(), role: 'nero',
+        content: `Got it. Your environment: ${settings}. Let me know if you need to adjust anything.`,
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    }
+  };
+
+  // Feature 14: Parallel Tasks
+  const startParallelTask = async (task: Task) => {
+    const activeTask: ActiveTask = {
+      taskId: task.id,
+      description: task.description,
+      startedAt: new Date().toISOString(),
+      status: 'active',
+    };
+    setActiveTasks(prev => [...prev, activeTask]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.setTaskActive(task.id, task.description);
+  };
+
+  const pauseParallelTask = async (taskId: string) => {
+    setActiveTasks(prev => prev.map(t => t.taskId === taskId ? { ...t, status: 'paused' } : t));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.pauseTask(taskId);
+  };
+
+  const focusOnTask = (task: ActiveTask) => {
+    const fullTask = openTasks.find(t => t.id === task.taskId);
+    if (fullTask) {
+      setShowParallelTasks(false);
+      startBodyDoubleMode(fullTask);
+    }
+  };
+
+  // Feature 15: Crisis Mode
+  const enterCrisisMode = () => {
+    setCrisisMode(true);
+    setBodyDoubleMode(false);
+    setBreathingPhase('inhale');
+    setBreathingCount(0);
+  };
+
+  const exitCrisisMode = async () => {
+    setCrisisMode(false);
+    setBreathingCount(0);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: "You made it through. Take your time getting back to things. I'm here.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Breathing cycle for crisis mode
+  useEffect(() => {
+    if (crisisMode) {
+      const pattern = BREATHING_PATTERNS.calm;
+      const breathingCycle = () => {
+        setBreathingPhase('inhale');
+        setTimeout(() => setBreathingPhase('hold'), pattern.inhale * 1000);
+        setTimeout(() => {
+          setBreathingPhase('exhale');
+          setBreathingCount(prev => prev + 1);
+        }, (pattern.inhale + pattern.hold) * 1000);
+      };
+
+      breathingCycle();
+      const interval = setInterval(breathingCycle, (pattern.inhale + pattern.hold + pattern.exhale) * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [crisisMode]);
 
   const clearHistory = async () => {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.clearMessages();
@@ -1334,6 +2191,371 @@ export default function App() {
     );
   }
 
+  // Feature 15: Crisis Mode
+  if (crisisMode) {
+    return (
+      <SafeAreaView style={[styles.container, styles.crisisContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.crisisContent}>
+          <Text style={styles.crisisTitle}>Everything can wait.</Text>
+          <Text style={styles.crisisSubtitle}>Let's just breathe together.</Text>
+
+          <View style={styles.breathingCircleContainer}>
+            <Animated.View style={[styles.breathingCircle, breathingPhase === 'inhale' && styles.breathingInhale, breathingPhase === 'exhale' && styles.breathingExhale]}>
+              <Text style={styles.breathingText}>
+                {breathingPhase === 'inhale' ? 'Breathe in...' : breathingPhase === 'hold' ? 'Hold...' : 'Breathe out...'}
+              </Text>
+            </Animated.View>
+          </View>
+
+          <Text style={styles.breathingCount}>{breathingCount} breaths</Text>
+
+          {breathingCount >= 5 && (
+            <TouchableOpacity style={styles.crisisExitButton} onPress={exitCrisisMode}>
+              <Text style={styles.crisisExitText}>I'm feeling better</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.crisisSkipButton} onPress={exitCrisisMode}>
+            <Text style={styles.crisisSkipText}>Exit</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 7: RSD Support
+  if (showRSDSupport) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.rsdContainer}>
+          <View style={styles.rsdCard}>
+            <Text style={styles.rsdTitle}>I noticed something</Text>
+            <Text style={styles.rsdMessage}>{RSD_SUPPORT_MESSAGES[Math.floor(Math.random() * RSD_SUPPORT_MESSAGES.length)]}</Text>
+
+            <View style={styles.rsdActions}>
+              <TouchableOpacity style={styles.rsdButton} onPress={() => handleRSDSupport('talk')}>
+                <Text style={styles.rsdButtonText}>Let's talk</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.rsdButton} onPress={() => handleRSDSupport('reframe')}>
+                <Text style={styles.rsdButtonText}>Help me reframe</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.rsdDismiss} onPress={() => handleRSDSupport('dismiss')}>
+              <Text style={styles.rsdDismissText}>I'm okay, thanks</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 4: Emotion/Context Tagging
+  if (showEmotionTag) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.emotionContainer}>
+          <View style={styles.emotionCard}>
+            <Text style={styles.emotionTitle}>What's going on?</Text>
+            <Text style={styles.emotionSubtitle}>This helps me understand and support you better</Text>
+
+            <Text style={styles.emotionSectionLabel}>How are you feeling?</Text>
+            <View style={styles.tagGrid}>
+              {EMOTION_TAGS.map(tag => (
+                <TouchableOpacity key={tag} style={[styles.tag, selectedEmotionTags.includes(tag) && styles.tagSelected]} onPress={() => toggleEmotionTag(tag)}>
+                  <Text style={[styles.tagText, selectedEmotionTags.includes(tag) && styles.tagTextSelected]}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.emotionSectionLabel}>Any context?</Text>
+            <View style={styles.tagGrid}>
+              {CONTEXT_TAGS.map(tag => (
+                <TouchableOpacity key={tag} style={[styles.tag, selectedContextTags.includes(tag) && styles.tagSelected]} onPress={() => toggleContextTag(tag)}>
+                  <Text style={[styles.tagText, selectedContextTags.includes(tag) && styles.tagTextSelected]}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.emotionActions}>
+              <TouchableOpacity style={styles.emotionSkip} onPress={() => { setShowEmotionTag(false); handleEnergySubmit(currentEnergy || 2, 'low', true); }}>
+                <Text style={styles.emotionSkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.emotionSubmit} onPress={handleEmotionTagComplete}>
+                <Text style={styles.emotionSubmitText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 6: Hyperfocus Warning
+  if (hyperfocusWarning && bodyDoubleMode) {
+    const checkInMessage = HYPERFOCUS_CHECK_INS[Math.floor(Math.random() * HYPERFOCUS_CHECK_INS.length)];
+    return (
+      <SafeAreaView style={[styles.container, styles.bodyDoubleContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.hyperfocusCard}>
+          <Text style={styles.hyperfocusTitle}>Deep focus check-in</Text>
+          <Text style={styles.hyperfocusMessage}>{checkInMessage}</Text>
+
+          <View style={styles.hyperfocusActions}>
+            <TouchableOpacity style={styles.hyperfocusButton} onPress={() => handleHyperfocusResponse('continue')}>
+              <Text style={styles.hyperfocusButtonText}>I'm good, keep going</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hyperfocusButton} onPress={() => handleHyperfocusResponse('break')}>
+              <Text style={styles.hyperfocusButtonText}>Take a break</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hyperfocusButton} onPress={() => handleHyperfocusResponse('end')}>
+              <Text style={styles.hyperfocusButtonText}>I'm done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 5: Transition Support
+  if (showTransitionSupport) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.transitionContainer}>
+          <View style={styles.transitionCard}>
+            <Text style={styles.transitionTitle}>Nice session!</Text>
+            <Text style={styles.transitionMessage}>Before jumping to the next thing, take a moment to transition.</Text>
+
+            <View style={styles.transitionTips}>
+              <Text style={styles.transitionTip}>• Stretch your body</Text>
+              <Text style={styles.transitionTip}>• Get some water</Text>
+              <Text style={styles.transitionTip}>• Look at something far away</Text>
+              <Text style={styles.transitionTip}>• Take 3 deep breaths</Text>
+            </View>
+
+            <TouchableOpacity style={styles.transitionButton} onPress={handleTransitionEnd}>
+              <Text style={styles.transitionButtonText}>I'm ready</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 10: Medication Reminder
+  if (showMedReminder && pendingMedReminder) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.medReminderContainer}>
+          <View style={styles.medReminderCard}>
+            <Text style={styles.medReminderTitle}>Medication Reminder</Text>
+            <Text style={styles.medReminderName}>{pendingMedReminder.name}</Text>
+            <Text style={styles.medReminderMessage}>Just a gentle reminder. No judgment either way.</Text>
+
+            <View style={styles.medReminderActions}>
+              <TouchableOpacity style={styles.medReminderButton} onPress={() => handleMedReminderResponse(false)}>
+                <Text style={styles.medReminderButtonText}>Not now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.medReminderButton, styles.medReminderButtonPrimary]} onPress={() => handleMedReminderResponse(true)}>
+                <Text style={styles.medReminderButtonTextPrimary}>Taken</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 9: Reflection View
+  if (showReflection && reflectionData) {
+    const insight = generateWeeklyInsight(reflectionData);
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.reflectionContainer}>
+          <View style={styles.reflectionCard}>
+            <View style={styles.reflectionHeader}>
+              <Text style={styles.reflectionTitle}>{reflectionData.period === 'week' ? 'This Week' : 'This Month'}</Text>
+              <TouchableOpacity onPress={() => setShowReflection(false)}><Text style={styles.reflectionClose}>✕</Text></TouchableOpacity>
+            </View>
+
+            <Text style={styles.reflectionInsight}>{insight}</Text>
+
+            <View style={styles.reflectionStats}>
+              <View style={styles.reflectionStat}>
+                <Text style={styles.reflectionStatValue}>{reflectionData.tasksCompleted}</Text>
+                <Text style={styles.reflectionStatLabel}>Tasks Done</Text>
+              </View>
+              <View style={styles.reflectionStat}>
+                <Text style={styles.reflectionStatValue}>{formatDurationShort(reflectionData.totalFocusTime)}</Text>
+                <Text style={styles.reflectionStatLabel}>Focus Time</Text>
+              </View>
+              <View style={styles.reflectionStat}>
+                <Text style={styles.reflectionStatValue}>{reflectionData.avgEnergy}/5</Text>
+                <Text style={styles.reflectionStatLabel}>Avg Energy</Text>
+              </View>
+            </View>
+
+            {reflectionData.wins.length > 0 && (
+              <View style={styles.reflectionWins}>
+                <Text style={styles.reflectionWinsTitle}>Wins</Text>
+                {reflectionData.wins.slice(0, 3).map((win, i) => (
+                  <Text key={i} style={styles.reflectionWin}>✓ {win}</Text>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.reflectionButton} onPress={() => setShowReflection(false)}>
+              <Text style={styles.reflectionButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 13: Done List Celebration
+  if (showDoneList) {
+    const message = generateDoneListMessage(todayCompletedTasks, todayFocusTime, memory.facts.name);
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.doneListContainer}>
+          <View style={styles.doneListCard}>
+            <Text style={styles.doneListTitle}>Today's Wins</Text>
+            <Text style={styles.doneListMessage}>{message}</Text>
+
+            <TouchableOpacity style={styles.doneListButton} onPress={() => setShowDoneList(false)}>
+              <Text style={styles.doneListButtonText}>Thanks, Nero</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 8: Waiting Mode View
+  if (showWaitingMode) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.waitingContainer}>
+          <View style={styles.waitingCard}>
+            <View style={styles.waitingHeader}>
+              <Text style={styles.waitingTitle}>Waiting On</Text>
+              <TouchableOpacity onPress={() => setShowWaitingMode(false)}><Text style={styles.waitingClose}>✕</Text></TouchableOpacity>
+            </View>
+
+            {waitingItems.length === 0 ? (
+              <Text style={styles.waitingEmpty}>Nothing in the waiting queue</Text>
+            ) : (
+              <ScrollView style={styles.waitingList}>
+                {waitingItems.map(item => (
+                  <View key={item.id} style={styles.waitingItem}>
+                    <View style={styles.waitingItemContent}>
+                      <Text style={styles.waitingItemDesc}>{item.description}</Text>
+                      <Text style={styles.waitingItemFor}>From: {item.waitingFor}</Text>
+                      <Text style={styles.waitingItemAge}>{getRelativeTime(item.createdAt)}</Text>
+                    </View>
+                    <View style={styles.waitingItemActions}>
+                      <TouchableOpacity style={styles.waitingItemButton} onPress={() => resolveWaitingItem(item.id, true)}>
+                        <Text style={styles.waitingItemButtonText}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.waitingItemButton, styles.waitingItemButtonDelete]} onPress={() => resolveWaitingItem(item.id, false)}>
+                        <Text style={styles.waitingItemButtonText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity style={styles.waitingAddButton} onPress={() => setShowAddWaiting(true)}>
+              <Text style={styles.waitingAddButtonText}>+ Add something you're waiting on</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 14: Parallel Tasks View
+  if (showParallelTasks) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.parallelContainer}>
+          <View style={styles.parallelCard}>
+            <View style={styles.parallelHeader}>
+              <Text style={styles.parallelTitle}>Tasks in Flight</Text>
+              <TouchableOpacity onPress={() => setShowParallelTasks(false)}><Text style={styles.parallelClose}>✕</Text></TouchableOpacity>
+            </View>
+
+            <Text style={styles.parallelSubtitle}>{activeTasks.length} task{activeTasks.length !== 1 ? 's' : ''} you're juggling</Text>
+
+            {activeTasks.map(task => (
+              <View key={task.taskId} style={styles.parallelTask}>
+                <View style={[styles.parallelTaskStatus, task.status === 'active' ? styles.parallelTaskActive : styles.parallelTaskPaused]} />
+                <Text style={styles.parallelTaskText}>{task.description}</Text>
+                <TouchableOpacity style={styles.parallelTaskFocus} onPress={() => focusOnTask(task)}>
+                  <Text style={styles.parallelTaskFocusText}>Focus</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <Text style={styles.parallelHint}>Want to pick one to focus on?</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 12: Sensory Environment Check
+  if (showSensoryCheck) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.sensoryContainer}>
+          <View style={styles.sensoryCard}>
+            <Text style={styles.sensoryTitle}>Environment Check</Text>
+            <Text style={styles.sensorySubtitle}>Is your space helping or hurting?</Text>
+
+            <Text style={styles.sensorySectionLabel}>Lighting</Text>
+            <View style={styles.sensoryOptions}>
+              {SENSORY_OPTIONS.lighting.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.sensoryOption, currentSensorySettings.lighting === opt && styles.sensoryOptionSelected]} onPress={() => setCurrentSensorySettings(prev => ({ ...prev, lighting: opt }))}>
+                  <Text style={[styles.sensoryOptionText, currentSensorySettings.lighting === opt && styles.sensoryOptionTextSelected]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.sensorySectionLabel}>Sound</Text>
+            <View style={styles.sensoryOptions}>
+              {SENSORY_OPTIONS.sound.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.sensoryOption, currentSensorySettings.sound === opt && styles.sensoryOptionSelected]} onPress={() => setCurrentSensorySettings(prev => ({ ...prev, sound: opt }))}>
+                  <Text style={[styles.sensoryOptionText, currentSensorySettings.sound === opt && styles.sensoryOptionTextSelected]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.sensoryActions}>
+              <TouchableOpacity style={styles.sensorySkip} onPress={() => setShowSensoryCheck(false)}>
+                <Text style={styles.sensorySkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sensorySubmit} onPress={handleSensorySubmit}>
+                <Text style={styles.sensorySubmitText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Settings
   if (showSettings) {
     return (
@@ -1395,6 +2617,67 @@ export default function App() {
                 <Text style={styles.bodyDoubleButtonText}>🧘 Start Focus Session</Text>
               </TouchableOpacity>
               <Text style={styles.settingsHint}>Nero stays with you while you work, with gentle check-ins</Text>
+            </View>
+
+            {/* Feature 11: External Motivation Mode */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>External Motivation Mode</Text>
+              <TouchableOpacity style={styles.toggleRow} onPress={toggleExternalMotivation}>
+                <Text style={styles.toggleLabel}>Get prompts every 10 min</Text>
+                <View style={[styles.toggle, externalMotivationMode && styles.toggleOn]}><View style={[styles.toggleThumb, externalMotivationMode && styles.toggleThumbOn]} /></View>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>For when internal motivation is gone</Text>
+            </View>
+
+            {/* Feature 8: Waiting Mode */}
+            {waitingItems.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Waiting On ({waitingItems.length})</Text>
+                <TouchableOpacity style={styles.waitingPreview} onPress={() => { setShowSettings(false); setShowWaitingMode(true); }}>
+                  <Text style={styles.waitingPreviewText}>{waitingItems[0].description}</Text>
+                  {waitingItems.length > 1 && <Text style={styles.waitingPreviewMore}>+{waitingItems.length - 1} more</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature 14: Parallel Tasks */}
+            {activeTasks.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Tasks in Flight ({activeTasks.length})</Text>
+                <TouchableOpacity style={styles.parallelPreview} onPress={() => { setShowSettings(false); setShowParallelTasks(true); }}>
+                  {activeTasks.slice(0, 2).map(t => (
+                    <Text key={t.taskId} style={styles.parallelPreviewText}>• {t.description}</Text>
+                  ))}
+                  {activeTasks.length > 2 && <Text style={styles.parallelPreviewMore}>+{activeTasks.length - 2} more</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature 9: Reflection */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Reflection</Text>
+              <View style={styles.reflectionButtons}>
+                <TouchableOpacity style={styles.reflectionPreviewButton} onPress={() => { setShowSettings(false); loadReflection('week'); }}>
+                  <Text style={styles.reflectionPreviewButtonText}>This Week</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.reflectionPreviewButton} onPress={() => { setShowSettings(false); loadReflection('month'); }}>
+                  <Text style={styles.reflectionPreviewButtonText}>This Month</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Feature 13: Done List */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.doneListPreview} onPress={() => { setShowSettings(false); setShowDoneList(true); }}>
+                <Text style={styles.doneListPreviewText}>🎉 See Today's Wins</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 12: Sensory Check */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.sensoryPreview} onPress={() => { setShowSettings(false); setShowSensoryCheck(true); }}>
+                <Text style={styles.sensoryPreviewText}>🌿 Environment Check</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.settingsSection}>
@@ -1480,6 +2763,20 @@ export default function App() {
           <View style={styles.focusTaskBanner}>
             <Text style={styles.focusTaskLabel}>Working on:</Text>
             <Text style={styles.focusTaskText}>{bodyDoubleSession.taskDescription}</Text>
+          </View>
+        )}
+
+        {/* Feature 11: External Motivation Mode Banner */}
+        {externalMotivationMode && !bodyDoubleMode && currentMotivationPrompt && (
+          <View style={styles.motivationBanner}>
+            <Text style={styles.motivationBannerText}>{currentMotivationPrompt}</Text>
+          </View>
+        )}
+
+        {/* Feature 1: Upcoming Time Block Banner */}
+        {upcomingBlock && !bodyDoubleMode && (
+          <View style={[styles.motivationBanner, { backgroundColor: COLORS.suggestion + '20', borderBottomColor: COLORS.suggestion + '40' }]}>
+            <Text style={[styles.motivationBannerText, { color: COLORS.suggestion }]}>Coming up: {upcomingBlock.title} at {upcomingBlock.startTime}</Text>
           </View>
         )}
 
@@ -1709,4 +3006,175 @@ const styles = StyleSheet.create({
   taskItemSwipingDelete: { backgroundColor: COLORS.delete + '30' },
   taskItemText: { color: COLORS.text, fontSize: 15, flex: 1, marginRight: 10 },
   taskItemAge: { color: COLORS.textDim, fontSize: 12 },
+
+  // ============ NEW FEATURE STYLES ============
+
+  // Feature 15: Crisis Mode
+  crisisContainer: { backgroundColor: '#0a0505' },
+  crisisContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  crisisTitle: { color: COLORS.text, fontSize: 28, fontWeight: '300', marginBottom: 8, textAlign: 'center' },
+  crisisSubtitle: { color: COLORS.textMuted, fontSize: 18, marginBottom: 48, textAlign: 'center' },
+  breathingCircleContainer: { width: 200, height: 200, justifyContent: 'center', alignItems: 'center', marginBottom: 32 },
+  breathingCircle: { width: 150, height: 150, borderRadius: 75, backgroundColor: COLORS.calm + '30', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.calm },
+  breathingInhale: { transform: [{ scale: 1.3 }] },
+  breathingExhale: { transform: [{ scale: 0.8 }] },
+  breathingText: { color: COLORS.calm, fontSize: 16, fontWeight: '500' },
+  breathingCount: { color: COLORS.textDim, fontSize: 14, marginBottom: 32 },
+  crisisExitButton: { backgroundColor: COLORS.calm, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 12, marginBottom: 16 },
+  crisisExitText: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+  crisisSkipButton: { padding: 12 },
+  crisisSkipText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 7: RSD Support
+  rsdContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  rsdCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  rsdTitle: { color: COLORS.rsd, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  rsdMessage: { color: COLORS.text, fontSize: 20, lineHeight: 28, marginBottom: 24 },
+  rsdActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  rsdButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  rsdButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  rsdDismiss: { padding: 12, alignItems: 'center' },
+  rsdDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 4: Emotion/Context Tagging
+  emotionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emotionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 420 },
+  emotionTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600', marginBottom: 8 },
+  emotionSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 24 },
+  emotionSectionLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 16 },
+  tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: { backgroundColor: COLORS.surfaceLight, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  tagSelected: { backgroundColor: COLORS.emotion + '30', borderColor: COLORS.emotion },
+  tagText: { color: COLORS.textMuted, fontSize: 13 },
+  tagTextSelected: { color: COLORS.emotion },
+  emotionActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  emotionSkip: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  emotionSkipText: { color: COLORS.textMuted, fontSize: 16 },
+  emotionSubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.emotion, alignItems: 'center' },
+  emotionSubmitText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+
+  // Feature 6: Hyperfocus Warning
+  hyperfocusCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '90%', maxWidth: 400 },
+  hyperfocusTitle: { color: COLORS.hyperfocus, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  hyperfocusMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 24 },
+  hyperfocusActions: { gap: 12 },
+  hyperfocusButton: { padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  hyperfocusButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 5: Transition Support
+  transitionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  transitionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 380 },
+  transitionTitle: { color: COLORS.transition, fontSize: 20, fontWeight: '600', marginBottom: 8 },
+  transitionMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 20 },
+  transitionTips: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 24 },
+  transitionTip: { color: COLORS.textMuted, fontSize: 14, lineHeight: 24 },
+  transitionButton: { backgroundColor: COLORS.transition, padding: 16, borderRadius: 12, alignItems: 'center' },
+  transitionButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+
+  // Feature 10: Medication Reminder
+  medReminderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  medReminderCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 360 },
+  medReminderTitle: { color: COLORS.medication, fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  medReminderName: { color: COLORS.text, fontSize: 24, fontWeight: '600', marginBottom: 8 },
+  medReminderMessage: { color: COLORS.textMuted, fontSize: 14, marginBottom: 24 },
+  medReminderActions: { flexDirection: 'row', gap: 12 },
+  medReminderButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  medReminderButtonPrimary: { backgroundColor: COLORS.medication },
+  medReminderButtonText: { color: COLORS.textMuted, fontSize: 16, fontWeight: '500' },
+  medReminderButtonTextPrimary: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+
+  // Feature 9: Reflection
+  reflectionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  reflectionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  reflectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  reflectionTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  reflectionClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  reflectionInsight: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 20, backgroundColor: COLORS.reflection + '20', padding: 16, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: COLORS.reflection },
+  reflectionStats: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  reflectionStat: { flex: 1, backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, alignItems: 'center' },
+  reflectionStatValue: { color: COLORS.text, fontSize: 24, fontWeight: '700' },
+  reflectionStatLabel: { color: COLORS.textMuted, fontSize: 11, marginTop: 4 },
+  reflectionWins: { marginBottom: 20 },
+  reflectionWinsTitle: { color: COLORS.accent, fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  reflectionWin: { color: COLORS.text, fontSize: 14, lineHeight: 22 },
+  reflectionButton: { backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
+  reflectionButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  reflectionButtons: { flexDirection: 'row', gap: 12 },
+  reflectionPreviewButton: { flex: 1, backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12, alignItems: 'center' },
+  reflectionPreviewButtonText: { color: COLORS.text, fontSize: 14, fontWeight: '500' },
+
+  // Feature 13: Done List
+  doneListContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  doneListCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  doneListTitle: { color: COLORS.celebration, fontSize: 22, fontWeight: '600', marginBottom: 16 },
+  doneListMessage: { color: COLORS.text, fontSize: 16, lineHeight: 26, marginBottom: 24, whiteSpace: 'pre-line' },
+  doneListButton: { backgroundColor: COLORS.celebration, borderRadius: 12, padding: 16, alignItems: 'center' },
+  doneListButtonText: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+  doneListPreview: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  doneListPreviewText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 8: Waiting Mode
+  waitingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  waitingCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, maxHeight: '80%' },
+  waitingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  waitingTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  waitingClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  waitingEmpty: { color: COLORS.textMuted, fontSize: 15, textAlign: 'center', paddingVertical: 32 },
+  waitingList: { maxHeight: 300 },
+  waitingItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 8 },
+  waitingItemContent: { flex: 1 },
+  waitingItemDesc: { color: COLORS.text, fontSize: 15, fontWeight: '500', marginBottom: 4 },
+  waitingItemFor: { color: COLORS.waiting, fontSize: 13 },
+  waitingItemAge: { color: COLORS.textDim, fontSize: 12, marginTop: 2 },
+  waitingItemActions: { flexDirection: 'row', gap: 8 },
+  waitingItemButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.accent, justifyContent: 'center', alignItems: 'center' },
+  waitingItemButtonDelete: { backgroundColor: COLORS.delete },
+  waitingItemButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  waitingAddButton: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+  waitingAddButtonText: { color: COLORS.waiting, fontSize: 14, fontWeight: '500' },
+  waitingPreview: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12 },
+  waitingPreviewText: { color: COLORS.text, fontSize: 14 },
+  waitingPreviewMore: { color: COLORS.waiting, fontSize: 13, marginTop: 4 },
+
+  // Feature 14: Parallel Tasks
+  parallelContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  parallelCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  parallelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  parallelTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  parallelClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  parallelSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  parallelTask: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 10 },
+  parallelTaskStatus: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+  parallelTaskActive: { backgroundColor: COLORS.accent },
+  parallelTaskPaused: { backgroundColor: COLORS.textDim },
+  parallelTaskText: { flex: 1, color: COLORS.text, fontSize: 15 },
+  parallelTaskFocus: { backgroundColor: COLORS.parallel, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  parallelTaskFocusText: { color: COLORS.text, fontSize: 13, fontWeight: '600' },
+  parallelHint: { color: COLORS.textMuted, fontSize: 13, textAlign: 'center', marginTop: 16 },
+  parallelPreview: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12 },
+  parallelPreviewText: { color: COLORS.text, fontSize: 13, lineHeight: 20 },
+  parallelPreviewMore: { color: COLORS.parallel, fontSize: 12, marginTop: 4 },
+
+  // Feature 12: Sensory Environment
+  sensoryContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  sensoryCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  sensoryTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600', marginBottom: 8 },
+  sensorySubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 24 },
+  sensorySectionLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 16 },
+  sensoryOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sensoryOption: { backgroundColor: COLORS.surfaceLight, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  sensoryOptionSelected: { backgroundColor: COLORS.accent + '30', borderColor: COLORS.accent },
+  sensoryOptionText: { color: COLORS.textMuted, fontSize: 14 },
+  sensoryOptionTextSelected: { color: COLORS.accent },
+  sensoryActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  sensorySkip: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  sensorySkipText: { color: COLORS.textMuted, fontSize: 16 },
+  sensorySubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.accent, alignItems: 'center' },
+  sensorySubmitText: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+  sensoryPreview: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  sensoryPreviewText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 11: External Motivation (uses existing toggle styles)
+  motivationBanner: { backgroundColor: COLORS.motivation + '20', padding: 14, borderBottomWidth: 1, borderBottomColor: COLORS.motivation + '40' },
+  motivationBannerText: { color: COLORS.motivation, fontSize: 14, textAlign: 'center' },
 });
