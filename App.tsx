@@ -102,6 +102,228 @@ interface Nudge {
   type: string;
 }
 
+// ============ NEW FEATURE TYPES ============
+
+// Feature 1: Time Blocking / Schedule Integration
+interface TimeBlock {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  taskId?: string;
+  isRecurring?: boolean;
+  recurringDays?: number[];
+}
+
+// Feature 2: Accountability Partners
+interface AccountabilityPartner {
+  id: string;
+  name: string;
+  email?: string;
+  shareProgress: boolean;
+  weeklyDigest: boolean;
+  lastNotified?: string;
+}
+
+// Feature 3: Task Decomposition
+interface Subtask {
+  id: string;
+  parentTaskId: string;
+  description: string;
+  status: 'open' | 'completed';
+  order: number;
+}
+
+// Feature 4: Emotion/Context Tagging
+interface EnergyContext {
+  id: string;
+  energyLogId?: string;
+  context: string;
+  tags: string[];
+  timestamp: string;
+}
+
+// Feature 8: Waiting Mode Support
+interface WaitingItem {
+  id: string;
+  description: string;
+  waitingFor: string;
+  createdAt: string;
+  expectedBy?: string;
+  status: 'waiting' | 'received' | 'expired';
+  lastCheckedAt?: string;
+}
+
+// Feature 10: Medication/Routine Tracking
+interface MedicationReminder {
+  id: string;
+  name: string;
+  times: string[];
+  days: number[];
+  enabled: boolean;
+  lastTaken?: string;
+}
+
+interface RoutineItem {
+  id: string;
+  name: string;
+  time: string;
+  days: number[];
+  enabled: boolean;
+  streak: number;
+  lastCompleted?: string;
+}
+
+// Feature 9: Weekly/Monthly Reflection
+interface ReflectionData {
+  period: 'week' | 'month';
+  startDate: string;
+  endDate: string;
+  tasksCompleted: number;
+  totalFocusTime: number;
+  avgEnergy: number;
+  topPatterns: string[];
+  wins: string[];
+  struggles: string[];
+}
+
+// Feature 14: Parallel Task Support
+interface ActiveTask {
+  taskId: string;
+  description: string;
+  startedAt: string;
+  status: 'active' | 'paused';
+}
+
+// ============ FEATURES 16-35 TYPES ============
+
+// Feature 16: Where Was I Recovery Mode
+interface SessionContext {
+  lastActiveTask?: string;
+  lastTopic?: string;
+  lastActivity: string;
+  awayDuration: number;
+}
+
+// Feature 17: Decision Fatigue Helper
+interface DecisionRequest {
+  options: string[];
+  context?: string;
+  timestamp: string;
+}
+
+// Feature 18: Dopamine Menu
+interface DopamineActivity {
+  id: string;
+  name: string;
+  category: 'movement' | 'sensory' | 'social' | 'creative' | 'rest';
+  duration: number; // minutes
+  lastUsed?: string;
+  effectiveness?: number; // 1-5
+}
+
+// Feature 20: Emotional Regulation
+interface EmotionalState {
+  emotion: string;
+  intensity: number; // 1-5
+  timestamp: string;
+  triggers?: string[];
+  copingUsed?: string;
+}
+
+// Feature 22: Impulse Delay Buffer
+interface DelayedImpulse {
+  id: string;
+  description: string;
+  category: 'purchase' | 'decision' | 'action';
+  createdAt: string;
+  delayUntil: string;
+  status: 'waiting' | 'approved' | 'dismissed';
+  estimatedCost?: number;
+}
+
+// Feature 23: Social Battery
+interface SocialInteraction {
+  id: string;
+  type: 'meeting' | 'call' | 'in-person' | 'message';
+  duration: number; // minutes
+  energyCost: number; // 1-5
+  timestamp: string;
+  notes?: string;
+}
+
+// Feature 25: Object Permanence / Relationship Tracking
+interface RelationshipReminder {
+  id: string;
+  personName: string;
+  relationship: string;
+  lastContact?: string;
+  preferredFrequency: number; // days
+  notes?: string;
+}
+
+// Feature 26: Flexible Routines
+interface FlexibleRoutine {
+  id: string;
+  name: string;
+  timeOfDay: 'morning' | 'evening';
+  items: RoutineCheckItem[];
+  minItemsForSuccess: number; // "good enough" threshold
+  streak: number;
+  lastCompleted?: string;
+}
+
+interface RoutineCheckItem {
+  id: string;
+  name: string;
+  optional: boolean;
+  completed: boolean;
+}
+
+// Feature 28: Interest-Based Task Tracking
+interface TaskCompletionPattern {
+  taskKeywords: string[];
+  avgCompletionTime: number;
+  completionRate: number;
+  energyWhenCompleted: number;
+}
+
+// Feature 29: Deadline Scaffolding
+interface Milestone {
+  id: string;
+  parentTaskId: string;
+  description: string;
+  dueDate: string;
+  status: 'pending' | 'completed';
+}
+
+// Feature 31: Quiet Hours
+interface QuietHours {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  days: number[];
+  allowUrgent: boolean;
+}
+
+// Feature 32: Win Journal
+interface WinEntry {
+  id: string;
+  content: string;
+  timestamp: string;
+  category?: 'task' | 'personal' | 'health' | 'social';
+}
+
+// Feature 35: Commitment Device
+interface Commitment {
+  id: string;
+  description: string;
+  deadline: string;
+  witness?: string; // accountability partner name
+  status: 'active' | 'kept' | 'broken';
+  createdAt: string;
+}
+
 // ============ CONSTANTS ============
 const COLORS = {
   bg: '#0a0a0f',
@@ -125,6 +347,41 @@ const COLORS = {
   complete: '#22c55e',
   delete: '#ef4444',
   quickAdd: '#ec4899',
+  // New feature colors
+  crisis: '#dc2626',
+  calm: '#06b6d4',
+  waiting: '#f59e0b',
+  reflection: '#a855f7',
+  medication: '#14b8a6',
+  motivation: '#f97316',
+  decompose: '#3b82f6',
+  emotion: '#ec4899',
+  transition: '#8b5cf6',
+  hyperfocus: '#eab308',
+  rsd: '#f472b6',
+  parallel: '#06b6d4',
+  celebration: '#fbbf24',
+  // Features 16-35 colors
+  recovery: '#38bdf8',
+  decision: '#a78bfa',
+  dopamine: '#fb923c',
+  timeBlinds: '#facc15',
+  emotional: '#f472b6',
+  procrastination: '#94a3b8',
+  impulse: '#f43f5e',
+  social: '#2dd4bf',
+  rumination: '#c084fc',
+  relationship: '#fb7185',
+  routine: '#4ade80',
+  shame: '#fda4af',
+  interest: '#60a5fa',
+  deadline: '#f87171',
+  accountability: '#34d399',
+  quiet: '#475569',
+  wins: '#fcd34d',
+  overload: '#64748b',
+  swap: '#22d3ee',
+  commitment: '#e879f9',
 };
 
 const ENERGY_COLORS = [COLORS.energy1, COLORS.energy2, COLORS.energy3, COLORS.energy4, COLORS.energy5];
@@ -145,6 +402,165 @@ const BODY_DOUBLE_CHECK_INS = [
   "I'm not going anywhere. How's it feel?",
 ];
 
+// Feature 4: Emotion Context Tags
+const EMOTION_TAGS = ['tired', 'stressed', 'anxious', 'overwhelmed', 'sad', 'frustrated', 'unmotivated', 'scattered', 'restless', 'calm', 'hopeful', 'focused'];
+const CONTEXT_TAGS = ['poor sleep', 'work stress', 'relationship', 'health', 'deadline', 'social drain', 'overstimulated', 'understimulated', 'hunger', 'pain', 'meds late', 'meds missed'];
+
+// Feature 6: Hyperfocus Messages
+const HYPERFOCUS_CHECK_INS = [
+  "You've been in deep focus for a while. Remember to drink water.",
+  "Amazing concentration! When did you last stretch?",
+  "Still here. Have you eaten recently?",
+  "Your focus is incredible right now. Quick body check - how are you physically?",
+  "3 hours deep! Consider a 5-minute break for your eyes.",
+];
+
+// Feature 7: RSD Support Messages
+const RSD_SUPPORT_MESSAGES = [
+  "That sounds like it hit hard. Want to talk through it?",
+  "It's okay to feel this way. The feeling is real even if the story isn't.",
+  "Sometimes our brains make feedback feel bigger than it is. What actually happened?",
+  "That stings. Let's separate what was said from what you're feeling.",
+];
+
+// Feature 11: External Motivation Prompts
+const MOTIVATION_PROMPTS = [
+  "One tiny step. What's the smallest thing you could do in 2 minutes?",
+  "Let's make it easy. What would take almost no effort?",
+  "Quick win time. What's something simple you could knock out?",
+  "No pressure mode. Pick anything - even getting a glass of water counts.",
+];
+
+// Feature 12: Sensory Environment Options
+const SENSORY_OPTIONS = {
+  lighting: ['dim', 'bright', 'natural', 'warm'],
+  sound: ['silence', 'white noise', 'music', 'ambient', 'nature sounds'],
+  movement: ['sitting', 'standing', 'walking', 'fidgeting'],
+  temperature: ['cool', 'warm', 'neutral'],
+};
+
+// Feature 15: Crisis Mode Breathing
+const BREATHING_PATTERNS = {
+  calm: { inhale: 4, hold: 4, exhale: 4 },
+  ground: { inhale: 4, hold: 7, exhale: 8 },
+  quick: { inhale: 2, hold: 2, exhale: 4 },
+};
+
+// Feature 13: Celebration Messages
+const CELEBRATION_MESSAGES = [
+  "Look at everything you did today!",
+  "These wins matter. Every single one.",
+  "You showed up. That's huge.",
+  "Progress, not perfection. And you made progress.",
+  "Your effort counts even when it doesn't feel like it.",
+];
+
+// ============ FEATURES 16-35 CONSTANTS ============
+
+// Feature 16: Where Was I Recovery
+const RECOVERY_MESSAGES = [
+  "Welcome back! You were working on: ",
+  "Hey, you're back! Last time you were focused on: ",
+  "Good to see you! Before you left, you were: ",
+];
+
+// Feature 17: Decision Fatigue
+const DECISION_PROMPTS = [
+  "Decision fatigue is real. Let me pick for you.",
+  "Too many choices? I've got you.",
+  "Your brain is tired of deciding. Here's what to do: ",
+];
+
+// Feature 18: Dopamine Menu
+const DEFAULT_DOPAMINE_ACTIVITIES: DopamineActivity[] = [
+  { id: '1', name: 'Take a short walk', category: 'movement', duration: 10 },
+  { id: '2', name: 'Listen to a favorite song', category: 'sensory', duration: 5 },
+  { id: '3', name: 'Have a healthy snack', category: 'rest', duration: 5 },
+  { id: '4', name: 'Do 10 jumping jacks', category: 'movement', duration: 2 },
+  { id: '5', name: 'Text a friend', category: 'social', duration: 5 },
+  { id: '6', name: 'Doodle for 5 minutes', category: 'creative', duration: 5 },
+  { id: '7', name: 'Step outside for fresh air', category: 'sensory', duration: 5 },
+  { id: '8', name: 'Watch one funny video', category: 'rest', duration: 3 },
+  { id: '9', name: 'Stretch your body', category: 'movement', duration: 5 },
+  { id: '10', name: 'Play with a fidget toy', category: 'sensory', duration: 5 },
+];
+
+// Feature 19: Time Blindness Anchors
+const TIME_ANCHOR_MESSAGES = [
+  "Quick time check: it's been {duration} since you started.",
+  "Time anchor: {duration} have passed.",
+  "Gentle reminder: you've been at this for {duration}.",
+];
+
+// Feature 20: Emotional Regulation
+const EMOTION_OPTIONS = ['anxious', 'frustrated', 'sad', 'angry', 'overwhelmed', 'numb', 'restless', 'hopeful', 'calm', 'excited'];
+const COPING_STRATEGIES = {
+  anxious: ['Deep breathing', 'Ground yourself (5-4-3-2-1)', 'Write worries down', 'Talk to someone'],
+  frustrated: ['Take a break', 'Physical movement', 'Vent (write or talk)', 'Change tasks'],
+  sad: ['Be gentle with yourself', 'Reach out to someone', 'Do something comforting', 'It\'s okay to rest'],
+  angry: ['Step away', 'Physical release', 'Write it out', 'Wait before responding'],
+  overwhelmed: ['One thing at a time', 'Breathe', 'Simplify', 'Ask for help'],
+  numb: ['Gentle movement', 'Sensory input', 'Connect with someone', 'Don\'t force it'],
+  restless: ['Move your body', 'Change scenery', 'Fidget freely', 'Channel into task'],
+  hopeful: ['Capture this feeling', 'Use momentum', 'Share with someone', 'Plan something'],
+  calm: ['Enjoy it', 'Do meaningful work', 'Reflect', 'Help someone'],
+  excited: ['Channel it', 'Write ideas down', 'Share the energy', 'Start something'],
+};
+
+// Feature 21: Procrastination Buddy
+const PROCRASTINATION_BLOCKERS = [
+  { label: 'Too big/overwhelming', suggestion: "Let's break it into tiny pieces" },
+  { label: 'Boring/uninteresting', suggestion: "Can we make it more fun or pair it with something?" },
+  { label: 'Unclear what to do', suggestion: "Let's figure out the first concrete step" },
+  { label: 'Scared of failing', suggestion: "Done is better than perfect. What's the minimum?" },
+  { label: 'Waiting for motivation', suggestion: "Motivation comes after starting. Just 2 minutes?" },
+  { label: "Don't know why it matters", suggestion: "What happens if you don't do it? Is that okay?" },
+];
+
+// Feature 24: Rumination Detection
+const RUMINATION_PATTERNS = [
+  /i keep thinking about/i, /can't stop thinking/i, /over and over/i,
+  /why did i/i, /should have/i, /what if i had/i, /i always/i, /i never/i,
+  /everyone thinks/i, /nobody understands/i, /it's always/i,
+];
+
+// Feature 27: Shame Spiral Detection
+const SHAME_PATTERNS = [
+  /i'm so stupid/i, /i'm the worst/i, /i can't do anything/i, /what's wrong with me/i,
+  /i should be able to/i, /why can't i just/i, /everyone else can/i, /i'm broken/i,
+  /i'm a mess/i, /i'm useless/i, /i hate myself/i, /i'm such a/i,
+];
+
+const SHAME_RESPONSES = [
+  "Hey, that's a lot of 'should'. ADHD brains work differently, not wrong.",
+  "I hear you being hard on yourself. What would you say to a friend?",
+  "Those thoughts feel true but they're not facts. Let's slow down.",
+  "Your brain is being mean to you right now. That's not fair or accurate.",
+];
+
+// Feature 30: Just Watch Me - Accountability Modes
+const ACCOUNTABILITY_MODES = [
+  { id: 'silent', name: 'Silent presence', description: "I'm just here. No check-ins." },
+  { id: 'gentle', name: 'Gentle check-ins', description: 'Occasional "how\'s it going?"' },
+  { id: 'active', name: 'Active accountability', description: 'Regular progress updates' },
+];
+
+// Feature 32: Win Journal Prompts
+const WIN_JOURNAL_PROMPTS = [
+  "What went well today?",
+  "What's one thing you're proud of?",
+  "What did you do that was hard?",
+  "How did you take care of yourself?",
+  "What made you smile today?",
+];
+
+// Feature 34: Task Swap Suggestions
+const TASK_SWAP_MESSAGES = [
+  "Stuck on this one? Maybe try something else for a bit.",
+  "Not feeling it? Here's another option:",
+  "Sometimes a different task unsticks the brain:",
+];
+
 const NERO_SYSTEM_PROMPT = `You are Nero, an AI companion for someone with ADHD. Warm, direct, no judgment.
 
 RULES:
@@ -152,13 +568,35 @@ RULES:
 - No bullet points or lists.
 - Casual like a friend.
 - When in body doubling mode, be a calm presence.
+- Detect emotional distress and RSD (rejection sensitive dysphoria) signals.
+- Notice when someone seems overwhelmed and offer crisis support.
+- Help break down tasks when they feel too big.
 
 BODY DOUBLING MODE:
 When active, you're just there. Like a friend sitting nearby while they work.
 - Don't over-check
 - Celebrate small wins
 - If they seem stuck, gently ask what's blocking them
-- Never guilt or pressure`;
+- Never guilt or pressure
+
+CRISIS MODE:
+When someone is overwhelmed or in emotional distress:
+- Be calm and grounding
+- Focus on breathing and the present moment
+- Everything else can wait
+- No productivity pressure
+
+RSD SUPPORT:
+When detecting rejection sensitivity:
+- Validate the feeling without amplifying it
+- Help separate emotion from facts
+- Gently reality-check without dismissing
+
+TASK DECOMPOSITION:
+When a task feels too big:
+- Ask "What's the first tiny step?"
+- Break it down until it feels doable
+- One piece at a time`;
 
 // ============ HELPERS ============
 const generateId = () => Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
@@ -193,6 +631,260 @@ const formatDurationShort = (ms: number) => {
 };
 
 const getTaskAge = (timestamp: string): number => (Date.now() - new Date(timestamp).getTime()) / (1000 * 60 * 60 * 24);
+
+// Feature 6: Hyperfocus Detection
+const detectHyperfocus = (sessionStartTime: string): { isHyperfocusing: boolean; duration: number } => {
+  const duration = Date.now() - new Date(sessionStartTime).getTime();
+  const hours = duration / (1000 * 60 * 60);
+  return { isHyperfocusing: hours >= 2, duration };
+};
+
+// Feature 7: RSD Detection
+const detectRSD = (message: string): boolean => {
+  const rsdPatterns = [
+    /they hate me/i, /i'm terrible/i, /i ruined/i, /everyone thinks/i,
+    /i can't do anything right/i, /they're mad at me/i, /i'm a failure/i,
+    /nobody likes me/i, /i messed up/i, /i'm so stupid/i, /rejected/i,
+    /they don't want me/i, /i'm not good enough/i, /i disappointed/i,
+  ];
+  return rsdPatterns.some(p => p.test(message));
+};
+
+// Feature 15: Crisis Detection
+const detectCrisis = (message: string): boolean => {
+  const crisisPatterns = [
+    /i can't do this/i, /overwhelmed/i, /falling apart/i, /too much/i,
+    /can't breathe/i, /panicking/i, /shutting down/i, /everything is wrong/i,
+    /i give up/i, /i can't cope/i, /meltdown/i, /breaking down/i,
+  ];
+  return crisisPatterns.some(p => p.test(message));
+};
+
+// Feature 5: Transition Detection
+const needsTransitionSupport = (sessionDuration: number, checkInCount: number): boolean => {
+  const hours = sessionDuration / (1000 * 60 * 60);
+  return hours >= 1 && checkInCount >= 3;
+};
+
+// Feature 13: Generate Done List Message
+const generateDoneListMessage = (completed: Task[], focusTime: number, name?: string): string => {
+  const greeting = name ? `${name}, ` : '';
+  const intro = CELEBRATION_MESSAGES[Math.floor(Math.random() * CELEBRATION_MESSAGES.length)];
+
+  let message = `${greeting}${intro}\n\n`;
+
+  if (completed.length > 0) {
+    message += `Today you completed:\n`;
+    completed.slice(0, 5).forEach(t => { message += `• ${t.description}\n`; });
+    if (completed.length > 5) message += `• ...and ${completed.length - 5} more!\n`;
+  }
+
+  if (focusTime > 0) {
+    message += `\nFocus time: ${formatDuration(focusTime)}`;
+  }
+
+  if (completed.length === 0 && focusTime === 0) {
+    message = `${greeting}You showed up today. That counts. Tomorrow is a new day.`;
+  }
+
+  return message;
+};
+
+// Feature 1: Check upcoming time blocks
+const getUpcomingTimeBlock = (blocks: TimeBlock[]): TimeBlock | null => {
+  const now = new Date();
+  const today = now.getDay();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  for (const block of blocks) {
+    const [hours, mins] = block.startTime.split(':').map(Number);
+    const blockTime = hours * 60 + mins;
+    const timeDiff = blockTime - currentTime;
+
+    if (block.isRecurring && block.recurringDays && !block.recurringDays.includes(today)) continue;
+
+    if (timeDiff > 0 && timeDiff <= 30) return block;
+  }
+  return null;
+};
+
+// Feature 9: Weekly Stats Summary
+const generateWeeklyInsight = (data: ReflectionData): string => {
+  const insights: string[] = [];
+
+  if (data.tasksCompleted > 0) {
+    insights.push(`You completed ${data.tasksCompleted} task${data.tasksCompleted > 1 ? 's' : ''} this ${data.period}.`);
+  }
+
+  if (data.totalFocusTime > 0) {
+    insights.push(`${formatDuration(data.totalFocusTime)} of focused work.`);
+  }
+
+  if (data.avgEnergy > 0) {
+    const energyWord = data.avgEnergy >= 4 ? 'good' : data.avgEnergy >= 3 ? 'okay' : 'challenging';
+    insights.push(`Average energy was ${energyWord} (${data.avgEnergy}/5).`);
+  }
+
+  if (data.wins.length > 0) {
+    insights.push(`Biggest wins: ${data.wins.slice(0, 3).join(', ')}`);
+  }
+
+  return insights.join(' ');
+};
+
+// ============ FEATURES 16-35 HELPERS ============
+
+// Feature 16: Where Was I - Calculate away duration
+const calculateAwayDuration = (lastSeen: string): number => {
+  return (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60); // minutes
+};
+
+const shouldShowRecovery = (lastSeen: string): boolean => {
+  const awayMinutes = calculateAwayDuration(lastSeen);
+  return awayMinutes >= 30; // Show recovery if away 30+ minutes
+};
+
+// Feature 17: Decision Helper - Random picker
+const pickRandomTask = (tasks: Task[]): Task | null => {
+  if (tasks.length === 0) return null;
+  return tasks[Math.floor(Math.random() * tasks.length)];
+};
+
+// Feature 19: Time Blindness - Format session duration
+const formatTimeAnchor = (startTime: string): string => {
+  const duration = Date.now() - new Date(startTime).getTime();
+  const minutes = Math.floor(duration / 60000);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours} hour${hours > 1 ? 's' : ''} and ${minutes % 60} minute${minutes % 60 !== 1 ? 's' : ''}`;
+  }
+  return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+};
+
+// Feature 23: Social Battery Calculator
+const calculateSocialBattery = (interactions: SocialInteraction[]): number => {
+  const today = new Date().setHours(0, 0, 0, 0);
+  const todayInteractions = interactions.filter(i => new Date(i.timestamp).setHours(0, 0, 0, 0) === today);
+  const totalDrain = todayInteractions.reduce((sum, i) => sum + i.energyCost, 0);
+  const maxBattery = 10;
+  return Math.max(0, maxBattery - totalDrain);
+};
+
+// Feature 24: Rumination Detection
+const detectRumination = (message: string, recentMessages: Message[]): boolean => {
+  // Check for rumination patterns in current message
+  const hasPattern = RUMINATION_PATTERNS.some(p => p.test(message));
+  if (!hasPattern) return false;
+
+  // Check if similar content appeared recently (last 5 messages)
+  const recentUserMessages = recentMessages.filter(m => m.role === 'user').slice(-5);
+  const messageWords = message.toLowerCase().split(/\s+/);
+
+  let repetitionCount = 0;
+  for (const recent of recentUserMessages) {
+    const recentWords = recent.content.toLowerCase().split(/\s+/);
+    const overlap = messageWords.filter(w => recentWords.includes(w) && w.length > 4).length;
+    if (overlap >= 3) repetitionCount++;
+  }
+
+  return repetitionCount >= 2;
+};
+
+// Feature 25: Check if relationship needs contact
+const needsContact = (reminder: RelationshipReminder): boolean => {
+  if (!reminder.lastContact) return true;
+  const daysSince = (Date.now() - new Date(reminder.lastContact).getTime()) / (1000 * 60 * 60 * 24);
+  return daysSince >= reminder.preferredFrequency;
+};
+
+// Feature 27: Shame Spiral Detection
+const detectShameSpiral = (message: string): boolean => {
+  return SHAME_PATTERNS.some(p => p.test(message));
+};
+
+// Feature 28: Interest-based task matching
+const findInterestBasedTask = (tasks: Task[], completedTasks: Task[]): Task | null => {
+  // Analyze recently completed tasks for patterns
+  const recentCompleted = completedTasks.slice(0, 10);
+  const completedKeywords = new Set<string>();
+
+  recentCompleted.forEach(t => {
+    t.description.toLowerCase().split(/\s+/).forEach(word => {
+      if (word.length > 3) completedKeywords.add(word);
+    });
+  });
+
+  // Find open tasks with similar keywords
+  const matchingTasks = tasks.filter(t => {
+    const taskWords = t.description.toLowerCase().split(/\s+/);
+    return taskWords.some(w => completedKeywords.has(w));
+  });
+
+  return matchingTasks.length > 0 ? matchingTasks[0] : null;
+};
+
+// Feature 29: Auto-generate milestones for deadline
+const generateMilestones = (task: Task, deadline: string): Milestone[] => {
+  const now = Date.now();
+  const deadlineTime = new Date(deadline).getTime();
+  const totalTime = deadlineTime - now;
+  const milestones: Milestone[] = [];
+
+  if (totalTime <= 0) return milestones;
+
+  // Create 3 milestones: 25%, 50%, 75% of time
+  const intervals = [0.25, 0.5, 0.75];
+  const labels = ['Start & outline', 'Main work', 'Review & polish'];
+
+  intervals.forEach((interval, i) => {
+    milestones.push({
+      id: generateId(),
+      parentTaskId: task.id,
+      description: labels[i],
+      dueDate: new Date(now + totalTime * interval).toISOString(),
+      status: 'pending',
+    });
+  });
+
+  return milestones;
+};
+
+// Feature 31: Check if currently in quiet hours
+const isQuietHours = (quietHours: QuietHours): boolean => {
+  if (!quietHours.enabled) return false;
+
+  const now = new Date();
+  const currentDay = now.getDay();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  if (!quietHours.days.includes(currentDay)) return false;
+
+  const [startH, startM] = quietHours.startTime.split(':').map(Number);
+  const [endH, endM] = quietHours.endTime.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return currentTime >= startMinutes && currentTime < endMinutes;
+  } else {
+    // Overnight quiet hours
+    return currentTime >= startMinutes || currentTime < endMinutes;
+  }
+};
+
+// Feature 34: Find alternative task for swapping
+const findSwapTask = (currentTask: Task | null, openTasks: Task[]): Task | null => {
+  if (!currentTask) return pickRandomTask(openTasks);
+  const alternatives = openTasks.filter(t => t.id !== currentTask.id);
+  return pickRandomTask(alternatives);
+};
+
+// Feature 35: Check for overdue commitments
+const getOverdueCommitments = (commitments: Commitment[]): Commitment[] => {
+  const now = new Date().toISOString();
+  return commitments.filter(c => c.status === 'active' && c.deadline < now);
+};
 
 // ============ FOCUS ANALYTICS ENGINE ============
 const FocusAnalytics = {
@@ -531,6 +1223,266 @@ const SupabaseService = {
   async markNudgeSent(nudgeId: string): Promise<void> { await supabase.from('nero_nudges').update({ sent_at: new Date().toISOString() }).eq('id', nudgeId); },
   async dismissNudge(nudgeId: string): Promise<void> { await supabase.from('nero_nudges').update({ dismissed_at: new Date().toISOString() }).eq('id', nudgeId); },
   async clearMessages(): Promise<void> { if (!this.userId) return; await supabase.from('nero_messages').delete().eq('user_id', this.userId); },
+
+  // Feature 1: Time Blocks
+  async getTimeBlocks(): Promise<TimeBlock[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_time_blocks').select('*').eq('user_id', this.userId).order('start_time', { ascending: true });
+    return (data || []).map(t => ({ id: t.id, title: t.title, startTime: t.start_time, endTime: t.end_time, taskId: t.task_id, isRecurring: t.is_recurring, recurringDays: t.recurring_days }));
+  },
+
+  async saveTimeBlock(block: TimeBlock): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_time_blocks').upsert({ id: block.id, user_id: this.userId, title: block.title, start_time: block.startTime, end_time: block.endTime, task_id: block.taskId, is_recurring: block.isRecurring, recurring_days: block.recurringDays });
+  },
+
+  async deleteTimeBlock(blockId: string): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_time_blocks').delete().eq('id', blockId);
+  },
+
+  // Feature 3: Subtasks
+  async getSubtasks(parentTaskId: string): Promise<Subtask[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_subtasks').select('*').eq('parent_task_id', parentTaskId).order('order_num', { ascending: true });
+    return (data || []).map(s => ({ id: s.id, parentTaskId: s.parent_task_id, description: s.description, status: s.status, order: s.order_num }));
+  },
+
+  async saveSubtask(subtask: Subtask): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_subtasks').upsert({ id: subtask.id, user_id: this.userId, parent_task_id: subtask.parentTaskId, description: subtask.description, status: subtask.status, order_num: subtask.order });
+  },
+
+  async completeSubtask(subtaskId: string): Promise<void> {
+    await supabase.from('nero_subtasks').update({ status: 'completed' }).eq('id', subtaskId);
+  },
+
+  // Feature 4: Emotion Context
+  async logEnergyContext(context: EnergyContext): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_energy_context').insert({ id: context.id, user_id: this.userId, energy_log_id: context.energyLogId, context: context.context, tags: context.tags, created_at: context.timestamp });
+  },
+
+  async getEnergyContexts(days: number = 14): Promise<EnergyContext[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_energy_context').select('*').eq('user_id', this.userId).gte('created_at', since).order('created_at', { ascending: false });
+    return (data || []).map(c => ({ id: c.id, energyLogId: c.energy_log_id, context: c.context, tags: c.tags || [], timestamp: c.created_at }));
+  },
+
+  // Feature 8: Waiting Items
+  async getWaitingItems(): Promise<WaitingItem[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_waiting_items').select('*').eq('user_id', this.userId).eq('status', 'waiting').order('created_at', { ascending: true });
+    return (data || []).map(w => ({ id: w.id, description: w.description, waitingFor: w.waiting_for, createdAt: w.created_at, expectedBy: w.expected_by, status: w.status, lastCheckedAt: w.last_checked_at }));
+  },
+
+  async saveWaitingItem(item: WaitingItem): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_waiting_items').upsert({ id: item.id, user_id: this.userId, description: item.description, waiting_for: item.waitingFor, created_at: item.createdAt, expected_by: item.expectedBy, status: item.status, last_checked_at: item.lastCheckedAt });
+  },
+
+  async updateWaitingItemStatus(itemId: string, status: 'waiting' | 'received' | 'expired'): Promise<void> {
+    await supabase.from('nero_waiting_items').update({ status, last_checked_at: new Date().toISOString() }).eq('id', itemId);
+  },
+
+  // Feature 10: Medication Reminders
+  async getMedicationReminders(): Promise<MedicationReminder[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_medication_reminders').select('*').eq('user_id', this.userId).eq('enabled', true);
+    return (data || []).map(m => ({ id: m.id, name: m.name, times: m.times || [], days: m.days || [0,1,2,3,4,5,6], enabled: m.enabled, lastTaken: m.last_taken }));
+  },
+
+  async saveMedicationReminder(reminder: MedicationReminder): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_medication_reminders').upsert({ id: reminder.id, user_id: this.userId, name: reminder.name, times: reminder.times, days: reminder.days, enabled: reminder.enabled, last_taken: reminder.lastTaken });
+  },
+
+  async markMedicationTaken(reminderId: string): Promise<void> {
+    await supabase.from('nero_medication_reminders').update({ last_taken: new Date().toISOString() }).eq('id', reminderId);
+  },
+
+  // Feature 10: Routines
+  async getRoutines(): Promise<RoutineItem[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_routines').select('*').eq('user_id', this.userId).eq('enabled', true);
+    return (data || []).map(r => ({ id: r.id, name: r.name, time: r.time, days: r.days || [0,1,2,3,4,5,6], enabled: r.enabled, streak: r.streak || 0, lastCompleted: r.last_completed }));
+  },
+
+  async saveRoutine(routine: RoutineItem): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_routines').upsert({ id: routine.id, user_id: this.userId, name: routine.name, time: routine.time, days: routine.days, enabled: routine.enabled, streak: routine.streak, last_completed: routine.lastCompleted });
+  },
+
+  async markRoutineCompleted(routineId: string, streak: number): Promise<void> {
+    await supabase.from('nero_routines').update({ last_completed: new Date().toISOString(), streak }).eq('id', routineId);
+  },
+
+  // Feature 9: Reflection Data
+  async getReflectionData(period: 'week' | 'month'): Promise<ReflectionData | null> {
+    if (!this.userId) return null;
+    const now = new Date();
+    const days = period === 'week' ? 7 : 30;
+    const startDate = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+
+    const [tasksData, energyData, focusData] = await Promise.all([
+      supabase.from('nero_tasks').select('*').eq('user_id', this.userId).eq('status', 'completed').gte('completed_at', startDate.toISOString()),
+      supabase.from('nero_energy_logs').select('*').eq('user_id', this.userId).gte('created_at', startDate.toISOString()),
+      supabase.from('nero_focus_sessions').select('*').eq('user_id', this.userId).gte('started_at', startDate.toISOString()),
+    ]);
+
+    const completedTasks = tasksData.data || [];
+    const energyLogs = energyData.data || [];
+    const sessions = focusData.data || [];
+
+    const avgEnergy = energyLogs.length > 0 ? energyLogs.reduce((sum, e) => sum + e.energy_level, 0) / energyLogs.length : 0;
+    const totalFocusTime = sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0);
+
+    return {
+      period,
+      startDate: startDate.toISOString(),
+      endDate: now.toISOString(),
+      tasksCompleted: completedTasks.length,
+      totalFocusTime,
+      avgEnergy: Math.round(avgEnergy * 10) / 10,
+      topPatterns: [],
+      wins: completedTasks.slice(0, 5).map(t => t.description),
+      struggles: [],
+    };
+  },
+
+  // Feature 14: Active/Parallel Tasks
+  async getActiveTasks(): Promise<ActiveTask[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_active_tasks').select('*').eq('user_id', this.userId).order('started_at', { ascending: false });
+    return (data || []).map(t => ({ taskId: t.task_id, description: t.description, startedAt: t.started_at, status: t.status }));
+  },
+
+  async setTaskActive(taskId: string, description: string): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_active_tasks').upsert({ task_id: taskId, user_id: this.userId, description, started_at: new Date().toISOString(), status: 'active' });
+  },
+
+  async pauseTask(taskId: string): Promise<void> {
+    await supabase.from('nero_active_tasks').update({ status: 'paused' }).eq('task_id', taskId);
+  },
+
+  async removeActiveTask(taskId: string): Promise<void> {
+    await supabase.from('nero_active_tasks').delete().eq('task_id', taskId);
+  },
+
+  // ============ FEATURES 16-35 SERVICE METHODS ============
+
+  // Feature 22: Impulse Delay Buffer
+  async getDelayedImpulses(): Promise<DelayedImpulse[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_delayed_impulses').select('*').eq('user_id', this.userId).eq('status', 'waiting').order('delay_until', { ascending: true });
+    return (data || []).map(i => ({ id: i.id, description: i.description, category: i.category, createdAt: i.created_at, delayUntil: i.delay_until, status: i.status, estimatedCost: i.estimated_cost }));
+  },
+
+  async saveDelayedImpulse(impulse: DelayedImpulse): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_delayed_impulses').upsert({ id: impulse.id, user_id: this.userId, description: impulse.description, category: impulse.category, created_at: impulse.createdAt, delay_until: impulse.delayUntil, status: impulse.status, estimated_cost: impulse.estimatedCost });
+  },
+
+  async updateImpulseStatus(impulseId: string, status: 'approved' | 'dismissed'): Promise<void> {
+    await supabase.from('nero_delayed_impulses').update({ status }).eq('id', impulseId);
+  },
+
+  // Feature 23: Social Battery
+  async logSocialInteraction(interaction: SocialInteraction): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_social_interactions').insert({ id: interaction.id, user_id: this.userId, type: interaction.type, duration: interaction.duration, energy_cost: interaction.energyCost, timestamp: interaction.timestamp, notes: interaction.notes });
+  },
+
+  async getSocialInteractions(days: number = 7): Promise<SocialInteraction[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_social_interactions').select('*').eq('user_id', this.userId).gte('timestamp', since).order('timestamp', { ascending: false });
+    return (data || []).map(s => ({ id: s.id, type: s.type, duration: s.duration, energyCost: s.energy_cost, timestamp: s.timestamp, notes: s.notes }));
+  },
+
+  // Feature 25: Relationship Reminders
+  async getRelationshipReminders(): Promise<RelationshipReminder[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_relationship_reminders').select('*').eq('user_id', this.userId).order('last_contact', { ascending: true });
+    return (data || []).map(r => ({ id: r.id, personName: r.person_name, relationship: r.relationship, lastContact: r.last_contact, preferredFrequency: r.preferred_frequency, notes: r.notes }));
+  },
+
+  async saveRelationshipReminder(reminder: RelationshipReminder): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_relationship_reminders').upsert({ id: reminder.id, user_id: this.userId, person_name: reminder.personName, relationship: reminder.relationship, last_contact: reminder.lastContact, preferred_frequency: reminder.preferredFrequency, notes: reminder.notes });
+  },
+
+  async markContactMade(reminderId: string): Promise<void> {
+    await supabase.from('nero_relationship_reminders').update({ last_contact: new Date().toISOString() }).eq('id', reminderId);
+  },
+
+  // Feature 20: Emotional States
+  async logEmotionalState(state: EmotionalState): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_emotional_states').insert({ user_id: this.userId, emotion: state.emotion, intensity: state.intensity, timestamp: state.timestamp, triggers: state.triggers, coping_used: state.copingUsed });
+  },
+
+  async getEmotionalHistory(days: number = 14): Promise<EmotionalState[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_emotional_states').select('*').eq('user_id', this.userId).gte('timestamp', since).order('timestamp', { ascending: false });
+    return (data || []).map(e => ({ emotion: e.emotion, intensity: e.intensity, timestamp: e.timestamp, triggers: e.triggers, copingUsed: e.coping_used }));
+  },
+
+  // Feature 32: Win Journal
+  async saveWinEntry(entry: WinEntry): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_win_journal').insert({ id: entry.id, user_id: this.userId, content: entry.content, timestamp: entry.timestamp, category: entry.category });
+  },
+
+  async getWinEntries(days: number = 30): Promise<WinEntry[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_win_journal').select('*').eq('user_id', this.userId).gte('timestamp', since).order('timestamp', { ascending: false });
+    return (data || []).map(w => ({ id: w.id, content: w.content, timestamp: w.timestamp, category: w.category }));
+  },
+
+  // Feature 35: Commitments
+  async getCommitments(): Promise<Commitment[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_commitments').select('*').eq('user_id', this.userId).eq('status', 'active').order('deadline', { ascending: true });
+    return (data || []).map(c => ({ id: c.id, description: c.description, deadline: c.deadline, witness: c.witness, status: c.status, createdAt: c.created_at }));
+  },
+
+  async saveCommitment(commitment: Commitment): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_commitments').upsert({ id: commitment.id, user_id: this.userId, description: commitment.description, deadline: commitment.deadline, witness: commitment.witness, status: commitment.status, created_at: commitment.createdAt });
+  },
+
+  async updateCommitmentStatus(commitmentId: string, status: 'kept' | 'broken'): Promise<void> {
+    await supabase.from('nero_commitments').update({ status }).eq('id', commitmentId);
+  },
+
+  // Feature 26: Flexible Routines
+  async getFlexibleRoutines(): Promise<FlexibleRoutine[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_flexible_routines').select('*').eq('user_id', this.userId);
+    return (data || []).map(r => ({ id: r.id, name: r.name, timeOfDay: r.time_of_day, items: r.items || [], minItemsForSuccess: r.min_items_for_success, streak: r.streak || 0, lastCompleted: r.last_completed }));
+  },
+
+  async saveFlexibleRoutine(routine: FlexibleRoutine): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_flexible_routines').upsert({ id: routine.id, user_id: this.userId, name: routine.name, time_of_day: routine.timeOfDay, items: routine.items, min_items_for_success: routine.minItemsForSuccess, streak: routine.streak, last_completed: routine.lastCompleted });
+  },
+
+  // Feature 29: Milestones
+  async getMilestones(taskId: string): Promise<Milestone[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_milestones').select('*').eq('parent_task_id', taskId).order('due_date', { ascending: true });
+    return (data || []).map(m => ({ id: m.id, parentTaskId: m.parent_task_id, description: m.description, dueDate: m.due_date, status: m.status }));
+  },
+
+  async saveMilestone(milestone: Milestone): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_milestones').upsert({ id: milestone.id, user_id: this.userId, parent_task_id: milestone.parentTaskId, description: milestone.description, due_date: milestone.dueDate, status: milestone.status });
+  },
 };
 
 // ============ AI SERVICE ============
@@ -755,7 +1707,168 @@ export default function App() {
   
   // Quick Add
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  
+
+  // ============ NEW FEATURE STATES ============
+
+  // Feature 1: Time Blocking
+  const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([]);
+  const [showTimeBlocks, setShowTimeBlocks] = useState(false);
+  const [upcomingBlock, setUpcomingBlock] = useState<TimeBlock | null>(null);
+
+  // Feature 2: Accountability Partners (local only for now)
+  const [accountabilityPartner, setAccountabilityPartner] = useState<AccountabilityPartner | null>(null);
+
+  // Feature 3: Task Decomposition
+  const [showDecompose, setShowDecompose] = useState(false);
+  const [decomposeTask, setDecomposeTask] = useState<Task | null>(null);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+
+  // Feature 4: Emotion/Context Tagging
+  const [showEmotionTag, setShowEmotionTag] = useState(false);
+  const [selectedEmotionTags, setSelectedEmotionTags] = useState<string[]>([]);
+  const [selectedContextTags, setSelectedContextTags] = useState<string[]>([]);
+  const [energyContexts, setEnergyContexts] = useState<EnergyContext[]>([]);
+
+  // Feature 5: Transition Support
+  const [showTransitionSupport, setShowTransitionSupport] = useState(false);
+
+  // Feature 6: Hyperfocus Detection
+  const [hyperfocusWarning, setHyperfocusWarning] = useState(false);
+  const [lastHyperfocusCheck, setLastHyperfocusCheck] = useState<string | null>(null);
+
+  // Feature 7: RSD Support
+  const [showRSDSupport, setShowRSDSupport] = useState(false);
+  const [rsdTriggerMessage, setRsdTriggerMessage] = useState('');
+
+  // Feature 8: Waiting Mode
+  const [waitingItems, setWaitingItems] = useState<WaitingItem[]>([]);
+  const [showWaitingMode, setShowWaitingMode] = useState(false);
+  const [showAddWaiting, setShowAddWaiting] = useState(false);
+
+  // Feature 9: Reflection
+  const [showReflection, setShowReflection] = useState(false);
+  const [reflectionData, setReflectionData] = useState<ReflectionData | null>(null);
+
+  // Feature 10: Medication/Routine
+  const [medicationReminders, setMedicationReminders] = useState<MedicationReminder[]>([]);
+  const [routines, setRoutines] = useState<RoutineItem[]>([]);
+  const [showMedReminder, setShowMedReminder] = useState(false);
+  const [pendingMedReminder, setPendingMedReminder] = useState<MedicationReminder | null>(null);
+
+  // Feature 11: External Motivation Mode
+  const [externalMotivationMode, setExternalMotivationMode] = useState(false);
+  const [motivationInterval, setMotivationInterval] = useState<NodeJS.Timeout | null>(null);
+  const [currentMotivationPrompt, setCurrentMotivationPrompt] = useState('');
+
+  // Feature 12: Sensory Environment
+  const [showSensoryCheck, setShowSensoryCheck] = useState(false);
+  const [currentSensorySettings, setCurrentSensorySettings] = useState<{lighting?: string; sound?: string; movement?: string}>({});
+
+  // Feature 13: Done List Celebration
+  const [showDoneList, setShowDoneList] = useState(false);
+  const [todayCompletedTasks, setTodayCompletedTasks] = useState<Task[]>([]);
+  const [todayFocusTime, setTodayFocusTime] = useState(0);
+
+  // Feature 14: Parallel Tasks
+  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+  const [showParallelTasks, setShowParallelTasks] = useState(false);
+
+  // Feature 15: Crisis/Meltdown Mode
+  const [crisisMode, setCrisisMode] = useState(false);
+  const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
+  const [breathingCount, setBreathingCount] = useState(0);
+
+  // ============ FEATURES 16-35 STATES ============
+
+  // Feature 16: Where Was I Recovery
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
+
+  // Feature 17: Decision Fatigue Helper
+  const [showDecisionHelper, setShowDecisionHelper] = useState(false);
+  const [decidedTask, setDecidedTask] = useState<Task | null>(null);
+
+  // Feature 18: Dopamine Menu
+  const [showDopamineMenu, setShowDopamineMenu] = useState(false);
+  const [dopamineActivities, setDopamineActivities] = useState<DopamineActivity[]>(DEFAULT_DOPAMINE_ACTIVITIES);
+
+  // Feature 19: Time Blindness Anchors
+  const [showTimeAnchor, setShowTimeAnchor] = useState(false);
+  const [lastTimeAnchor, setLastTimeAnchor] = useState<string | null>(null);
+
+  // Feature 20: Emotional Regulation
+  const [showEmotionalCheck, setShowEmotionalCheck] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [emotionIntensity, setEmotionIntensity] = useState(3);
+  const [emotionalHistory, setEmotionalHistory] = useState<EmotionalState[]>([]);
+
+  // Feature 21: Procrastination Buddy
+  const [showProcrastinationHelp, setShowProcrastinationHelp] = useState(false);
+  const [procrastinationTask, setProcrastinationTask] = useState<Task | null>(null);
+
+  // Feature 22: Impulse Delay Buffer
+  const [delayedImpulses, setDelayedImpulses] = useState<DelayedImpulse[]>([]);
+  const [showImpulseBuffer, setShowImpulseBuffer] = useState(false);
+  const [showAddImpulse, setShowAddImpulse] = useState(false);
+  const [readyImpulses, setReadyImpulses] = useState<DelayedImpulse[]>([]);
+
+  // Feature 23: Social Battery
+  const [socialInteractions, setSocialInteractions] = useState<SocialInteraction[]>([]);
+  const [socialBattery, setSocialBattery] = useState(10);
+  const [showSocialBattery, setShowSocialBattery] = useState(false);
+  const [showLogSocial, setShowLogSocial] = useState(false);
+
+  // Feature 24: Rumination Interrupt
+  const [showRuminationHelp, setShowRuminationHelp] = useState(false);
+
+  // Feature 25: Relationship Reminders
+  const [relationshipReminders, setRelationshipReminders] = useState<RelationshipReminder[]>([]);
+  const [showRelationships, setShowRelationships] = useState(false);
+  const [overdueContacts, setOverdueContacts] = useState<RelationshipReminder[]>([]);
+
+  // Feature 26: Flexible Routines
+  const [flexibleRoutines, setFlexibleRoutines] = useState<FlexibleRoutine[]>([]);
+  const [showRoutineCheck, setShowRoutineCheck] = useState(false);
+  const [currentRoutine, setCurrentRoutine] = useState<FlexibleRoutine | null>(null);
+
+  // Feature 27: Shame Spiral
+  const [showShameSupport, setShowShameSupport] = useState(false);
+
+  // Feature 28: Interest-Based Task Matching
+  const [interestBasedSuggestion, setInterestBasedSuggestion] = useState<Task | null>(null);
+
+  // Feature 29: Deadline Scaffolding
+  const [showDeadlineSetup, setShowDeadlineSetup] = useState(false);
+  const [deadlineTask, setDeadlineTask] = useState<Task | null>(null);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+
+  // Feature 30: Just Watch Me Accountability
+  const [accountabilityMode, setAccountabilityMode] = useState<string>('gentle');
+  const [showAccountabilitySetup, setShowAccountabilitySetup] = useState(false);
+
+  // Feature 31: Quiet Hours
+  const [quietHours, setQuietHours] = useState<QuietHours>({ enabled: false, startTime: '22:00', endTime: '08:00', days: [0,1,2,3,4,5,6], allowUrgent: true });
+  const [isInQuietHours, setIsInQuietHours] = useState(false);
+
+  // Feature 32: Win Journal
+  const [winEntries, setWinEntries] = useState<WinEntry[]>([]);
+  const [showWinJournal, setShowWinJournal] = useState(false);
+  const [showAddWin, setShowAddWin] = useState(false);
+  const [currentWinPrompt, setCurrentWinPrompt] = useState('');
+
+  // Feature 33: Sensory Overload Mode
+  const [sensoryOverloadMode, setSensoryOverloadMode] = useState(false);
+
+  // Feature 34: Task Swapping
+  const [showTaskSwap, setShowTaskSwap] = useState(false);
+  const [swapSuggestion, setSwapSuggestion] = useState<Task | null>(null);
+
+  // Feature 35: Commitment Device
+  const [commitments, setCommitments] = useState<Commitment[]>([]);
+  const [showCommitments, setShowCommitments] = useState(false);
+  const [showAddCommitment, setShowAddCommitment] = useState(false);
+  const [overdueCommitments, setOverdueCommitments] = useState<Commitment[]>([]);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
   const fabAnim = useRef(new Animated.Value(1)).current;
@@ -845,6 +1958,164 @@ export default function App() {
     }
   }, [focusSessions]);
 
+  // Feature 6: Hyperfocus Detection
+  useEffect(() => {
+    if (bodyDoubleMode && bodyDoubleSession) {
+      const checkHyperfocus = setInterval(() => {
+        const { isHyperfocusing, duration } = detectHyperfocus(bodyDoubleSession.startedAt);
+        const hoursSinceLastCheck = lastHyperfocusCheck ? (Date.now() - new Date(lastHyperfocusCheck).getTime()) / 3600000 : 999;
+
+        if (isHyperfocusing && hoursSinceLastCheck >= 1 && !hyperfocusWarning) {
+          setHyperfocusWarning(true);
+          setLastHyperfocusCheck(new Date().toISOString());
+        }
+      }, 60000);
+      return () => clearInterval(checkHyperfocus);
+    }
+  }, [bodyDoubleMode, bodyDoubleSession, lastHyperfocusCheck, hyperfocusWarning]);
+
+  // Feature 1: Time Block Notifications
+  useEffect(() => {
+    if (timeBlocks.length > 0) {
+      const checkBlocks = setInterval(() => {
+        const upcoming = getUpcomingTimeBlock(timeBlocks);
+        if (upcoming && (!upcomingBlock || upcoming.id !== upcomingBlock.id)) {
+          setUpcomingBlock(upcoming);
+        }
+      }, 60000);
+      return () => clearInterval(checkBlocks);
+    }
+  }, [timeBlocks, upcomingBlock]);
+
+  // Feature 10: Medication Reminder Check
+  useEffect(() => {
+    if (medicationReminders.length > 0) {
+      const checkMeds = setInterval(() => {
+        const now = new Date();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const today = now.getDay();
+
+        for (const reminder of medicationReminders) {
+          if (!reminder.enabled || !reminder.days.includes(today)) continue;
+
+          for (const time of reminder.times) {
+            const [h, m] = time.split(':');
+            const reminderTime = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+
+            if (currentTime === reminderTime) {
+              const lastTaken = reminder.lastTaken ? new Date(reminder.lastTaken) : null;
+              const alreadyTakenToday = lastTaken && lastTaken.toDateString() === now.toDateString();
+
+              if (!alreadyTakenToday && !pendingMedReminder) {
+                setPendingMedReminder(reminder);
+                setShowMedReminder(true);
+              }
+            }
+          }
+        }
+      }, 60000);
+      return () => clearInterval(checkMeds);
+    }
+  }, [medicationReminders, pendingMedReminder]);
+
+  // Feature 11: External Motivation Mode
+  useEffect(() => {
+    if (externalMotivationMode) {
+      const prompt = MOTIVATION_PROMPTS[Math.floor(Math.random() * MOTIVATION_PROMPTS.length)];
+      setCurrentMotivationPrompt(prompt);
+
+      const interval = setInterval(() => {
+        const newPrompt = MOTIVATION_PROMPTS[Math.floor(Math.random() * MOTIVATION_PROMPTS.length)];
+        setCurrentMotivationPrompt(newPrompt);
+        if (Platform.OS !== 'web') Vibration.vibrate(100);
+      }, 10 * 60 * 1000); // Every 10 minutes
+
+      setMotivationInterval(interval);
+      return () => clearInterval(interval);
+    } else {
+      if (motivationInterval) clearInterval(motivationInterval);
+      setCurrentMotivationPrompt('');
+    }
+  }, [externalMotivationMode]);
+
+  // Feature 13: Calculate today's completed tasks for Done List
+  useEffect(() => {
+    const today = new Date().setHours(0, 0, 0, 0);
+    const todayTasks = completedTasks.filter(t => t.completedAt && new Date(t.completedAt).setHours(0, 0, 0, 0) === today);
+    setTodayCompletedTasks(todayTasks);
+
+    const todaySessions = focusSessions.filter(s => new Date(s.endedAt).setHours(0, 0, 0, 0) === today);
+    const totalTime = todaySessions.reduce((sum, s) => sum + s.durationMs, 0);
+    setTodayFocusTime(totalTime);
+  }, [completedTasks, focusSessions]);
+
+  // ============ FEATURES 16-35 EFFECTS ============
+
+  // Feature 16: Check for recovery mode on app load
+  useEffect(() => {
+    if (!isLoading && memory.facts.lastSeen) {
+      const shouldRecover = shouldShowRecovery(memory.facts.lastSeen);
+      if (shouldRecover && messages.length > 1) {
+        const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+        const context: SessionContext = {
+          lastActiveTask: bodyDoubleSession?.taskDescription,
+          lastTopic: lastUserMessage?.content.slice(0, 50),
+          lastActivity: memory.facts.lastSeen,
+          awayDuration: calculateAwayDuration(memory.facts.lastSeen),
+        };
+        setSessionContext(context);
+        setShowRecovery(true);
+      }
+    }
+  }, [isLoading]);
+
+  // Feature 19: Time blindness anchors during focus
+  useEffect(() => {
+    if (bodyDoubleMode && bodyDoubleSession) {
+      const anchorInterval = setInterval(() => {
+        const hoursSinceAnchor = lastTimeAnchor ? (Date.now() - new Date(lastTimeAnchor).getTime()) / 3600000 : 999;
+        if (hoursSinceAnchor >= 0.5) { // Every 30 minutes
+          setShowTimeAnchor(true);
+          setLastTimeAnchor(new Date().toISOString());
+        }
+      }, 60000);
+      return () => clearInterval(anchorInterval);
+    }
+  }, [bodyDoubleMode, bodyDoubleSession, lastTimeAnchor]);
+
+  // Feature 22: Check for ready impulses
+  useEffect(() => {
+    const now = new Date().toISOString();
+    const ready = delayedImpulses.filter(i => i.delayUntil <= now && i.status === 'waiting');
+    setReadyImpulses(ready);
+  }, [delayedImpulses]);
+
+  // Feature 23: Calculate social battery
+  useEffect(() => {
+    const battery = calculateSocialBattery(socialInteractions);
+    setSocialBattery(battery);
+  }, [socialInteractions]);
+
+  // Feature 25: Check overdue contacts
+  useEffect(() => {
+    const overdue = relationshipReminders.filter(needsContact);
+    setOverdueContacts(overdue);
+  }, [relationshipReminders]);
+
+  // Feature 31: Check quiet hours
+  useEffect(() => {
+    const checkQuiet = () => setIsInQuietHours(isQuietHours(quietHours));
+    checkQuiet();
+    const interval = setInterval(checkQuiet, 60000);
+    return () => clearInterval(interval);
+  }, [quietHours]);
+
+  // Feature 35: Check overdue commitments
+  useEffect(() => {
+    const overdue = getOverdueCommitments(commitments);
+    setOverdueCommitments(overdue);
+  }, [commitments]);
+
   const initializeApp = async () => {
     try {
       let storedDeviceId = await AsyncStorage.getItem('@nero/deviceId');
@@ -869,9 +2140,15 @@ export default function App() {
         try {
           setSyncStatus('syncing');
           await SupabaseService.initialize(storedDeviceId);
-          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions] = await Promise.all([
+          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions, cloudTimeBlocks, cloudWaiting, cloudMeds, cloudRoutines, cloudContexts] = await Promise.all([
             SupabaseService.getMemory(), SupabaseService.getMessages(100), SupabaseService.getPatterns(),
             SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30), SupabaseService.getFocusSessions(30),
+            SupabaseService.getTimeBlocks(), SupabaseService.getWaitingItems(), SupabaseService.getMedicationReminders(),
+            SupabaseService.getRoutines(), SupabaseService.getEnergyContexts(14),
+            SupabaseService.getDelayedImpulses(), SupabaseService.getSocialInteractions(7),
+            SupabaseService.getRelationshipReminders(), SupabaseService.getWinEntries(30),
+            SupabaseService.getCommitments(), SupabaseService.getFlexibleRoutines(),
+            SupabaseService.getEmotionalHistory(14),
           ]);
           if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
           if (cloudMessages.length > 0) setMessages(cloudMessages);
@@ -881,6 +2158,8 @@ export default function App() {
             await SupabaseService.saveMessage(welcome);
           }
           setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted); setFocusSessions(cloudSessions);
+          setTimeBlocks(cloudTimeBlocks); setWaitingItems(cloudWaiting); setMedicationReminders(cloudMeds);
+          setRoutines(cloudRoutines); setEnergyContexts(cloudContexts);
           SupabaseService.analyzePatterns();
           setSyncStatus('synced');
         } catch { setSyncStatus('offline'); await loadLocalData(); }
@@ -910,17 +2189,31 @@ export default function App() {
     if (syncEnabled && SupabaseService.userId) { try { setSyncStatus('syncing'); await SupabaseService.saveMemory(newMemory); setSyncStatus('synced'); } catch { setSyncStatus('offline'); } }
   }, [syncEnabled]);
 
-  const handleEnergySubmit = async (level: number, mood: string) => {
+  const handleEnergySubmit = async (level: number, mood: string, skipContext: boolean = false) => {
     setCurrentEnergy(level);
     setShowEnergyCheck(false);
     const now = new Date().toISOString();
     setLastEnergyCheck(now);
     await AsyncStorage.setItem('@nero/lastEnergyCheck', now);
     if (syncEnabled && SupabaseService.userId) await SupabaseService.logEnergy(level, mood);
-    
+
+    // Feature 4: Show emotion/context tagging for low energy
+    if (level <= 2 && !skipContext) {
+      setShowEmotionTag(true);
+      return;
+    }
+
     const suggestion = TaskSuggestionEngine.suggestTask(openTasks, level, patterns, completedTasks);
     setTaskSuggestion(suggestion);
     setSuggestionMessage(TaskSuggestionEngine.generateSuggestionMessage(suggestion, level, memory.facts.name));
+    setShowTaskSuggestion(true);
+  };
+
+  const handleEmotionTagComplete = () => {
+    handleEmotionSubmit();
+    const suggestion = TaskSuggestionEngine.suggestTask(openTasks, currentEnergy || 2, patterns, completedTasks);
+    setTaskSuggestion(suggestion);
+    setSuggestionMessage(TaskSuggestionEngine.generateSuggestionMessage(suggestion, currentEnergy || 2, memory.facts.name));
     setShowTaskSuggestion(true);
   };
 
@@ -998,6 +2291,11 @@ export default function App() {
   const endBodyDoubleMode = async (completed: boolean = false) => {
     const endTime = new Date().toISOString();
     const duration = bodyDoubleSession ? Date.now() - new Date(bodyDoubleSession.startedAt).getTime() : 0;
+
+    // Feature 5: Check if transition support is needed
+    if (bodyDoubleSession && needsTransitionSupport(duration, bodyDoubleSession.checkInCount)) {
+      setShowTransitionSupport(true);
+    }
 
     // Save focus session
     if (bodyDoubleSession && syncEnabled && SupabaseService.userId) {
@@ -1088,6 +2386,35 @@ export default function App() {
 
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(userMessage);
 
+    // Feature 15: Crisis Detection
+    if (detectCrisis(text) && !crisisMode) {
+      setIsThinking(false);
+      enterCrisisMode();
+      return;
+    }
+
+    // Feature 7: RSD Detection
+    if (detectRSD(text) && !showRSDSupport) {
+      setRsdTriggerMessage(text);
+      setShowRSDSupport(true);
+      setIsThinking(false);
+      return;
+    }
+
+    // Feature 24: Rumination Detection
+    if (detectRumination(text, messages) && !showRuminationHelp) {
+      setShowRuminationHelp(true);
+      setIsThinking(false);
+      return;
+    }
+
+    // Feature 27: Shame Spiral Detection
+    if (detectShameSpiral(text) && !showShameSupport) {
+      setShowShameSupport(true);
+      setIsThinking(false);
+      return;
+    }
+
     if (bodyDoubleMode && bodyDoubleSession) {
       setBodyDoubleSession({ ...bodyDoubleSession, lastCheckIn: new Date().toISOString() });
     }
@@ -1151,6 +2478,582 @@ export default function App() {
   };
 
   const dismissNudge = async () => { if (pendingNudge) { await SupabaseService.dismissNudge(pendingNudge.id); setPendingNudge(null); } };
+
+  // ============ NEW FEATURE HANDLERS ============
+
+  // Feature 3: Task Decomposition
+  const startDecompose = (task: Task) => {
+    setDecomposeTask(task);
+    setSubtasks([]);
+    setShowDecompose(true);
+  };
+
+  const addSubtask = async (description: string) => {
+    if (!decomposeTask) return;
+    const subtask: Subtask = {
+      id: generateId(),
+      parentTaskId: decomposeTask.id,
+      description,
+      status: 'open',
+      order: subtasks.length,
+    };
+    setSubtasks(prev => [...prev, subtask]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveSubtask(subtask);
+  };
+
+  const completeSubtask = async (subtaskId: string) => {
+    setSubtasks(prev => prev.map(s => s.id === subtaskId ? { ...s, status: 'completed' } : s));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.completeSubtask(subtaskId);
+  };
+
+  // Feature 4: Emotion/Context Tagging
+  const handleEmotionSubmit = async () => {
+    if (!currentEnergy) return;
+    const context: EnergyContext = {
+      id: generateId(),
+      context: [...selectedEmotionTags, ...selectedContextTags].join(', '),
+      tags: [...selectedEmotionTags, ...selectedContextTags],
+      timestamp: new Date().toISOString(),
+    };
+    setEnergyContexts(prev => [context, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.logEnergyContext(context);
+    setShowEmotionTag(false);
+    setSelectedEmotionTags([]);
+    setSelectedContextTags([]);
+  };
+
+  const toggleEmotionTag = (tag: string) => {
+    setSelectedEmotionTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  const toggleContextTag = (tag: string) => {
+    setSelectedContextTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+  };
+
+  // Feature 5: Transition Support
+  const handleTransitionEnd = async () => {
+    setShowTransitionSupport(false);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: "Take a moment. Stretch, breathe, maybe grab some water. The next thing can wait a minute.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 6: Hyperfocus Warning Response
+  const handleHyperfocusResponse = async (action: 'continue' | 'break' | 'end') => {
+    setHyperfocusWarning(false);
+    let content = '';
+
+    if (action === 'continue') {
+      content = "Alright, keep going! I'll check in again later. Remember to hydrate.";
+    } else if (action === 'break') {
+      content = "Smart. Take 5-10 minutes. Move around, drink water, rest your eyes. I'll be here.";
+    } else {
+      await endBodyDoubleMode(true);
+      return;
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 7: RSD Support
+  const handleRSDSupport = async (action: 'talk' | 'reframe' | 'dismiss') => {
+    setShowRSDSupport(false);
+    let content = '';
+
+    if (action === 'talk') {
+      content = "I'm here. Tell me what happened - just the facts first, then how you're feeling.";
+    } else if (action === 'reframe') {
+      content = "Let's reality-check this together. What actually happened vs what your brain is telling you?";
+    } else {
+      content = "That's okay. The feeling will pass. I'm here if you want to talk later.";
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    setRsdTriggerMessage('');
+  };
+
+  // Feature 8: Waiting Mode
+  const addWaitingItem = async (description: string, waitingFor: string, expectedBy?: string) => {
+    const item: WaitingItem = {
+      id: generateId(),
+      description,
+      waitingFor,
+      createdAt: new Date().toISOString(),
+      expectedBy,
+      status: 'waiting',
+    };
+    setWaitingItems(prev => [...prev, item]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveWaitingItem(item);
+    setShowAddWaiting(false);
+  };
+
+  const resolveWaitingItem = async (itemId: string, received: boolean) => {
+    const status = received ? 'received' : 'expired';
+    setWaitingItems(prev => prev.filter(w => w.id !== itemId));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.updateWaitingItemStatus(itemId, status);
+  };
+
+  // Feature 9: Reflection
+  const loadReflection = async (period: 'week' | 'month') => {
+    if (syncEnabled && SupabaseService.userId) {
+      const data = await SupabaseService.getReflectionData(period);
+      setReflectionData(data);
+      setShowReflection(true);
+    }
+  };
+
+  // Feature 10: Medication Reminder Response
+  const handleMedReminderResponse = async (taken: boolean) => {
+    if (pendingMedReminder && taken && syncEnabled && SupabaseService.userId) {
+      await SupabaseService.markMedicationTaken(pendingMedReminder.id);
+    }
+    setShowMedReminder(false);
+    setPendingMedReminder(null);
+  };
+
+  // Feature 11: External Motivation Toggle
+  const toggleExternalMotivation = () => {
+    setExternalMotivationMode(prev => !prev);
+  };
+
+  // Feature 12: Sensory Environment
+  const handleSensorySubmit = async () => {
+    setShowSensoryCheck(false);
+    const settings = Object.entries(currentSensorySettings).filter(([_, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ');
+    if (settings) {
+      const neroMessage: Message = {
+        id: generateId(), role: 'nero',
+        content: `Got it. Your environment: ${settings}. Let me know if you need to adjust anything.`,
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    }
+  };
+
+  // Feature 14: Parallel Tasks
+  const startParallelTask = async (task: Task) => {
+    const activeTask: ActiveTask = {
+      taskId: task.id,
+      description: task.description,
+      startedAt: new Date().toISOString(),
+      status: 'active',
+    };
+    setActiveTasks(prev => [...prev, activeTask]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.setTaskActive(task.id, task.description);
+  };
+
+  const pauseParallelTask = async (taskId: string) => {
+    setActiveTasks(prev => prev.map(t => t.taskId === taskId ? { ...t, status: 'paused' } : t));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.pauseTask(taskId);
+  };
+
+  const focusOnTask = (task: ActiveTask) => {
+    const fullTask = openTasks.find(t => t.id === task.taskId);
+    if (fullTask) {
+      setShowParallelTasks(false);
+      startBodyDoubleMode(fullTask);
+    }
+  };
+
+  // Feature 15: Crisis Mode
+  const enterCrisisMode = () => {
+    setCrisisMode(true);
+    setBodyDoubleMode(false);
+    setBreathingPhase('inhale');
+    setBreathingCount(0);
+  };
+
+  const exitCrisisMode = async () => {
+    setCrisisMode(false);
+    setBreathingCount(0);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: "You made it through. Take your time getting back to things. I'm here.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Breathing cycle for crisis mode
+  useEffect(() => {
+    if (crisisMode) {
+      const pattern = BREATHING_PATTERNS.calm;
+      const breathingCycle = () => {
+        setBreathingPhase('inhale');
+        setTimeout(() => setBreathingPhase('hold'), pattern.inhale * 1000);
+        setTimeout(() => {
+          setBreathingPhase('exhale');
+          setBreathingCount(prev => prev + 1);
+        }, (pattern.inhale + pattern.hold) * 1000);
+      };
+
+      breathingCycle();
+      const interval = setInterval(breathingCycle, (pattern.inhale + pattern.hold + pattern.exhale) * 1000);
+      return () => clearInterval(interval);
+    }
+  }, [crisisMode]);
+
+  // ============ FEATURES 16-35 HANDLERS ============
+
+  // Feature 16: Where Was I Recovery
+  const handleRecoveryDismiss = () => {
+    setShowRecovery(false);
+    setSessionContext(null);
+  };
+
+  const handleRecoveryResume = async () => {
+    setShowRecovery(false);
+    if (sessionContext?.lastActiveTask) {
+      const task = openTasks.find(t => t.description === sessionContext.lastActiveTask);
+      if (task) startBodyDoubleMode(task);
+    }
+    setSessionContext(null);
+  };
+
+  // Feature 17: Decision Fatigue Helper
+  const handleDecisionHelp = () => {
+    const picked = pickRandomTask(openTasks);
+    setDecidedTask(picked);
+    setShowDecisionHelper(true);
+  };
+
+  const handleDecisionAccept = () => {
+    setShowDecisionHelper(false);
+    if (decidedTask) startBodyDoubleMode(decidedTask);
+    setDecidedTask(null);
+  };
+
+  // Feature 18: Dopamine Menu
+  const handleDopamineSelect = async (activity: DopamineActivity) => {
+    setShowDopamineMenu(false);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: `Go ${activity.name.toLowerCase()}! Take ${activity.duration} minutes. I'll be here.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 19: Time Anchor
+  const handleTimeAnchorDismiss = () => {
+    setShowTimeAnchor(false);
+  };
+
+  // Feature 20: Emotional Regulation
+  const handleEmotionalSubmit = async () => {
+    if (!currentEmotion) return;
+    const state: EmotionalState = {
+      emotion: currentEmotion,
+      intensity: emotionIntensity,
+      timestamp: new Date().toISOString(),
+    };
+    setEmotionalHistory(prev => [state, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.logEmotionalState(state);
+
+    const strategies = COPING_STRATEGIES[currentEmotion as keyof typeof COPING_STRATEGIES] || [];
+    const suggestion = strategies[Math.floor(Math.random() * strategies.length)];
+
+    setShowEmotionalCheck(false);
+    setCurrentEmotion(null);
+
+    if (suggestion) {
+      const neroMessage: Message = {
+        id: generateId(), role: 'nero',
+        content: `Feeling ${currentEmotion}. That's valid. Maybe try: ${suggestion}`,
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    }
+  };
+
+  // Feature 21: Procrastination Buddy
+  const handleProcrastinationHelp = (task: Task) => {
+    setProcrastinationTask(task);
+    setShowProcrastinationHelp(true);
+  };
+
+  const handleProcrastinationBlocker = async (blocker: typeof PROCRASTINATION_BLOCKERS[0]) => {
+    setShowProcrastinationHelp(false);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: blocker.suggestion,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    setProcrastinationTask(null);
+  };
+
+  // Feature 22: Impulse Delay Buffer
+  const addDelayedImpulse = async (description: string, category: 'purchase' | 'decision' | 'action', cost?: number) => {
+    const impulse: DelayedImpulse = {
+      id: generateId(),
+      description,
+      category,
+      createdAt: new Date().toISOString(),
+      delayUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+      status: 'waiting',
+      estimatedCost: cost,
+    };
+    setDelayedImpulses(prev => [...prev, impulse]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveDelayedImpulse(impulse);
+    setShowAddImpulse(false);
+  };
+
+  const handleImpulseDecision = async (impulseId: string, approved: boolean) => {
+    const status = approved ? 'approved' : 'dismissed';
+    setDelayedImpulses(prev => prev.filter(i => i.id !== impulseId));
+    setReadyImpulses(prev => prev.filter(i => i.id !== impulseId));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.updateImpulseStatus(impulseId, status);
+
+    const message = approved
+      ? "You still want it after 24 hours. Go for it!"
+      : "Good call. You didn't need it after all.";
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content: message, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 23: Social Battery
+  const logSocialInteraction = async (type: SocialInteraction['type'], duration: number, energyCost: number) => {
+    const interaction: SocialInteraction = {
+      id: generateId(),
+      type,
+      duration,
+      energyCost,
+      timestamp: new Date().toISOString(),
+    };
+    setSocialInteractions(prev => [interaction, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.logSocialInteraction(interaction);
+    setShowLogSocial(false);
+  };
+
+  // Feature 24: Rumination Interrupt
+  const handleRuminationHelp = async (action: 'journal' | 'reframe' | 'distract') => {
+    setShowRuminationHelp(false);
+    let content = '';
+
+    if (action === 'journal') {
+      content = "Let's write it all out. Get every thought out of your head and onto the screen. I'm listening.";
+    } else if (action === 'reframe') {
+      content = "Let's challenge that thought. What evidence supports it? What evidence contradicts it?";
+    } else {
+      content = "Sometimes the best thing is a pattern interrupt. Want to try a quick dopamine activity?";
+      setShowDopamineMenu(true);
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 25: Relationship Reminders
+  const markContactMade = async (reminderId: string) => {
+    setRelationshipReminders(prev => prev.map(r => r.id === reminderId ? { ...r, lastContact: new Date().toISOString() } : r));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.markContactMade(reminderId);
+  };
+
+  // Feature 26: Flexible Routines
+  const handleRoutineItemToggle = (routineId: string, itemId: string) => {
+    setFlexibleRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+      const items = r.items.map(i => i.id === itemId ? { ...i, completed: !i.completed } : i);
+      return { ...r, items };
+    }));
+  };
+
+  const handleRoutineComplete = async () => {
+    if (!currentRoutine) return;
+    const completedCount = currentRoutine.items.filter(i => i.completed).length;
+    const isSuccess = completedCount >= currentRoutine.minItemsForSuccess;
+
+    const updatedRoutine = {
+      ...currentRoutine,
+      streak: isSuccess ? currentRoutine.streak + 1 : 0,
+      lastCompleted: new Date().toISOString(),
+      items: currentRoutine.items.map(i => ({ ...i, completed: false })),
+    };
+
+    setFlexibleRoutines(prev => prev.map(r => r.id === currentRoutine.id ? updatedRoutine : r));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveFlexibleRoutine(updatedRoutine);
+
+    setShowRoutineCheck(false);
+    setCurrentRoutine(null);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: isSuccess
+        ? `${completedCount} items done. That counts! ${updatedRoutine.streak} day streak.`
+        : `${completedCount} items. Some days are like that. Tomorrow is fresh.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 27: Shame Spiral Support
+  const handleShameSupport = async (action: 'reframe' | 'compassion' | 'dismiss') => {
+    setShowShameSupport(false);
+    let content = '';
+
+    if (action === 'reframe') {
+      content = "Let's look at this differently. What would you tell a friend who said this about themselves?";
+    } else if (action === 'compassion') {
+      content = "You're being really hard on yourself. ADHD brains struggle with things that seem 'easy' to others. That's not a character flaw.";
+    } else {
+      content = "Okay. I'm here if you want to talk.";
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 28: Interest-Based Suggestion
+  const getInterestBasedSuggestion = () => {
+    const suggestion = findInterestBasedTask(openTasks, completedTasks);
+    setInterestBasedSuggestion(suggestion);
+  };
+
+  // Feature 29: Deadline Scaffolding
+  const setupDeadline = async (task: Task, deadline: string) => {
+    const newMilestones = generateMilestones(task, deadline);
+    setMilestones(newMilestones);
+
+    for (const milestone of newMilestones) {
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMilestone(milestone);
+    }
+
+    setShowDeadlineSetup(false);
+    setDeadlineTask(null);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: `Got it. I've broken this into ${newMilestones.length} milestones. First up: "${newMilestones[0]?.description}" by ${new Date(newMilestones[0]?.dueDate).toLocaleDateString()}.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 32: Win Journal
+  const addWinEntry = async (content: string, category?: WinEntry['category']) => {
+    const entry: WinEntry = {
+      id: generateId(),
+      content,
+      timestamp: new Date().toISOString(),
+      category,
+    };
+    setWinEntries(prev => [entry, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveWinEntry(entry);
+    setShowAddWin(false);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: "That's a win. Captured it. These add up.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 33: Sensory Overload Mode
+  const toggleSensoryOverload = () => {
+    setSensoryOverloadMode(prev => !prev);
+    if (!sensoryOverloadMode) {
+      // Entering overload mode
+      const neroMessage: Message = {
+        id: generateId(), role: 'nero',
+        content: "Simplified mode on. Less noise. Just breathe.",
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+    }
+  };
+
+  // Feature 34: Task Swapping
+  const handleTaskSwap = () => {
+    const current = bodyDoubleSession?.taskId ? openTasks.find(t => t.id === bodyDoubleSession.taskId) : null;
+    const swap = findSwapTask(current || null, openTasks);
+    setSwapSuggestion(swap);
+    setShowTaskSwap(true);
+  };
+
+  const acceptTaskSwap = async () => {
+    setShowTaskSwap(false);
+    if (swapSuggestion) {
+      if (bodyDoubleMode) await endBodyDoubleMode(false);
+      startBodyDoubleMode(swapSuggestion);
+    }
+    setSwapSuggestion(null);
+  };
+
+  // Feature 35: Commitment Device
+  const addCommitment = async (description: string, deadline: string, witness?: string) => {
+    const commitment: Commitment = {
+      id: generateId(),
+      description,
+      deadline,
+      witness,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+    setCommitments(prev => [...prev, commitment]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveCommitment(commitment);
+    setShowAddCommitment(false);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: `Commitment logged: "${description}" by ${new Date(deadline).toLocaleDateString()}.${witness ? ` ${witness} is your witness.` : ''} You got this.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  const resolveCommitment = async (commitmentId: string, kept: boolean) => {
+    const status = kept ? 'kept' : 'broken';
+    setCommitments(prev => prev.filter(c => c.id !== commitmentId));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.updateCommitmentStatus(commitmentId, status);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: kept ? "You kept your commitment. That matters." : "It didn't happen this time. What got in the way? No judgment.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
 
   const clearHistory = async () => {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.clearMessages();
@@ -1334,6 +3237,729 @@ export default function App() {
     );
   }
 
+  // ============ FEATURES 16-35 UI COMPONENTS ============
+
+  // Feature 16: Where Was I Recovery
+  if (showRecovery && sessionContext) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.recoveryContainer}>
+          <View style={styles.recoveryCard}>
+            <Text style={styles.recoveryTitle}>Welcome back!</Text>
+            <Text style={styles.recoveryMessage}>
+              You were away for {Math.round(sessionContext.awayDuration)} minutes.
+              {sessionContext.lastActiveTask && `\n\nYou were working on: "${sessionContext.lastActiveTask}"`}
+              {sessionContext.lastTopic && !sessionContext.lastActiveTask && `\n\nLast topic: "${sessionContext.lastTopic}..."`}
+            </Text>
+            <View style={styles.recoveryActions}>
+              <TouchableOpacity style={styles.recoveryButton} onPress={handleRecoveryDismiss}>
+                <Text style={styles.recoveryButtonText}>Start fresh</Text>
+              </TouchableOpacity>
+              {sessionContext.lastActiveTask && (
+                <TouchableOpacity style={[styles.recoveryButton, styles.recoveryButtonPrimary]} onPress={handleRecoveryResume}>
+                  <Text style={styles.recoveryButtonTextPrimary}>Resume task</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 17: Decision Fatigue Helper
+  if (showDecisionHelper) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.decisionContainer}>
+          <View style={styles.decisionCard}>
+            <Text style={styles.decisionTitle}>I'll decide for you</Text>
+            <Text style={styles.decisionMessage}>{DECISION_PROMPTS[Math.floor(Math.random() * DECISION_PROMPTS.length)]}</Text>
+            {decidedTask && (
+              <View style={styles.decisionTaskCard}>
+                <Text style={styles.decisionTaskText}>{decidedTask.description}</Text>
+              </View>
+            )}
+            <View style={styles.decisionActions}>
+              <TouchableOpacity style={styles.decisionButton} onPress={() => { setDecidedTask(pickRandomTask(openTasks)); }}>
+                <Text style={styles.decisionButtonText}>Pick another</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.decisionButton, styles.decisionButtonPrimary]} onPress={handleDecisionAccept}>
+                <Text style={styles.decisionButtonTextPrimary}>Do this one</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.decisionDismiss} onPress={() => setShowDecisionHelper(false)}>
+              <Text style={styles.decisionDismissText}>Never mind</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 18: Dopamine Menu
+  if (showDopamineMenu) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.dopamineContainer}>
+          <View style={styles.dopamineCard}>
+            <Text style={styles.dopamineTitle}>Dopamine Menu</Text>
+            <Text style={styles.dopamineSubtitle}>Pick a quick reward</Text>
+            <ScrollView style={styles.dopamineList}>
+              {dopamineActivities.map(activity => (
+                <TouchableOpacity key={activity.id} style={styles.dopamineItem} onPress={() => handleDopamineSelect(activity)}>
+                  <Text style={styles.dopamineItemName}>{activity.name}</Text>
+                  <Text style={styles.dopamineItemDuration}>{activity.duration}m</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.dopamineDismiss} onPress={() => setShowDopamineMenu(false)}>
+              <Text style={styles.dopamineDismissText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 19: Time Blindness Anchor
+  if (showTimeAnchor && bodyDoubleMode && bodyDoubleSession) {
+    const timeString = formatTimeAnchor(bodyDoubleSession.startedAt);
+    return (
+      <SafeAreaView style={[styles.container, styles.bodyDoubleContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.timeAnchorCard}>
+          <Text style={styles.timeAnchorTitle}>Time Check</Text>
+          <Text style={styles.timeAnchorMessage}>{TIME_ANCHOR_MESSAGES[Math.floor(Math.random() * TIME_ANCHOR_MESSAGES.length)].replace('{duration}', timeString)}</Text>
+          <TouchableOpacity style={styles.timeAnchorButton} onPress={handleTimeAnchorDismiss}>
+            <Text style={styles.timeAnchorButtonText}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 20: Emotional Regulation Check
+  if (showEmotionalCheck) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.emotionalContainer}>
+          <View style={styles.emotionalCard}>
+            <Text style={styles.emotionalTitle}>Emotional check-in</Text>
+            <Text style={styles.emotionalSubtitle}>How are you feeling right now?</Text>
+            <View style={styles.emotionalGrid}>
+              {EMOTION_OPTIONS.map(emotion => (
+                <TouchableOpacity key={emotion} style={[styles.emotionalOption, currentEmotion === emotion && styles.emotionalOptionSelected]} onPress={() => setCurrentEmotion(emotion)}>
+                  <Text style={[styles.emotionalOptionText, currentEmotion === emotion && styles.emotionalOptionTextSelected]}>{emotion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {currentEmotion && (
+              <View style={styles.intensitySlider}>
+                <Text style={styles.intensityLabel}>Intensity: {emotionIntensity}/5</Text>
+                <View style={styles.intensityButtons}>
+                  {[1,2,3,4,5].map(n => (
+                    <TouchableOpacity key={n} style={[styles.intensityButton, emotionIntensity === n && styles.intensityButtonSelected]} onPress={() => setEmotionIntensity(n)}>
+                      <Text style={styles.intensityButtonText}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            <View style={styles.emotionalActions}>
+              <TouchableOpacity style={styles.emotionalSkip} onPress={() => setShowEmotionalCheck(false)}>
+                <Text style={styles.emotionalSkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.emotionalSubmit, !currentEmotion && styles.emotionalSubmitDisabled]} onPress={handleEmotionalSubmit} disabled={!currentEmotion}>
+                <Text style={styles.emotionalSubmitText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 21: Procrastination Buddy
+  if (showProcrastinationHelp && procrastinationTask) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.procrastinationContainer}>
+          <View style={styles.procrastinationCard}>
+            <Text style={styles.procrastinationTitle}>What's blocking you?</Text>
+            <Text style={styles.procrastinationTask}>Task: "{procrastinationTask.description}"</Text>
+            <ScrollView style={styles.procrastinationOptions}>
+              {PROCRASTINATION_BLOCKERS.map((blocker, i) => (
+                <TouchableOpacity key={i} style={styles.procrastinationOption} onPress={() => handleProcrastinationBlocker(blocker)}>
+                  <Text style={styles.procrastinationOptionText}>{blocker.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.procrastinationDismiss} onPress={() => setShowProcrastinationHelp(false)}>
+              <Text style={styles.procrastinationDismissText}>Something else</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 22: Ready Impulses Review
+  if (readyImpulses.length > 0 && !showImpulseBuffer) {
+    const impulse = readyImpulses[0];
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.impulseContainer}>
+          <View style={styles.impulseCard}>
+            <Text style={styles.impulseTitle}>24 hours later...</Text>
+            <Text style={styles.impulseMessage}>You wanted to: "{impulse.description}"</Text>
+            {impulse.estimatedCost && <Text style={styles.impulseCost}>${impulse.estimatedCost}</Text>}
+            <Text style={styles.impulseQuestion}>Do you still want this?</Text>
+            <View style={styles.impulseActions}>
+              <TouchableOpacity style={styles.impulseButton} onPress={() => handleImpulseDecision(impulse.id, false)}>
+                <Text style={styles.impulseButtonText}>Nah, I'm good</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.impulseButton, styles.impulseButtonPrimary]} onPress={() => handleImpulseDecision(impulse.id, true)}>
+                <Text style={styles.impulseButtonTextPrimary}>Still want it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 23: Social Battery Warning
+  if (socialBattery <= 2 && !showSocialBattery && socialInteractions.length > 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.socialContainer}>
+          <View style={styles.socialCard}>
+            <Text style={styles.socialTitle}>Social Battery Low</Text>
+            <View style={styles.batteryIndicator}>
+              <View style={[styles.batteryLevel, { width: `${socialBattery * 10}%` }]} />
+            </View>
+            <Text style={styles.socialMessage}>You've had a lot of social interaction today. Consider some alone time.</Text>
+            <TouchableOpacity style={styles.socialButton} onPress={() => setShowSocialBattery(true)}>
+              <Text style={styles.socialButtonText}>Thanks for the heads up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 24: Rumination Help
+  if (showRuminationHelp) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.ruminationContainer}>
+          <View style={styles.ruminationCard}>
+            <Text style={styles.ruminationTitle}>Thought loop detected</Text>
+            <Text style={styles.ruminationMessage}>You've been circling around similar thoughts. That's exhausting. Want to try something?</Text>
+            <View style={styles.ruminationActions}>
+              <TouchableOpacity style={styles.ruminationButton} onPress={() => handleRuminationHelp('journal')}>
+                <Text style={styles.ruminationButtonText}>Write it out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.ruminationButton} onPress={() => handleRuminationHelp('reframe')}>
+                <Text style={styles.ruminationButtonText}>Challenge it</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.ruminationButton} onPress={() => handleRuminationHelp('distract')}>
+                <Text style={styles.ruminationButtonText}>Break the loop</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.ruminationDismiss} onPress={() => setShowRuminationHelp(false)}>
+              <Text style={styles.ruminationDismissText}>I'm okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 27: Shame Spiral Support
+  if (showShameSupport) {
+    const shameMessage = SHAME_RESPONSES[Math.floor(Math.random() * SHAME_RESPONSES.length)];
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.shameContainer}>
+          <View style={styles.shameCard}>
+            <Text style={styles.shameTitle}>Hey, pause for a sec</Text>
+            <Text style={styles.shameMessage}>{shameMessage}</Text>
+            <View style={styles.shameActions}>
+              <TouchableOpacity style={styles.shameButton} onPress={() => handleShameSupport('reframe')}>
+                <Text style={styles.shameButtonText}>Help me reframe</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shameButton} onPress={() => handleShameSupport('compassion')}>
+                <Text style={styles.shameButtonText}>I need compassion</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.shameDismiss} onPress={() => handleShameSupport('dismiss')}>
+              <Text style={styles.shameDismissText}>I'm okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 32: Win Journal
+  if (showWinJournal) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.winJournalContainer}>
+          <View style={styles.winJournalCard}>
+            <View style={styles.winJournalHeader}>
+              <Text style={styles.winJournalTitle}>Win Journal</Text>
+              <TouchableOpacity onPress={() => setShowWinJournal(false)}><Text style={styles.winJournalClose}>✕</Text></TouchableOpacity>
+            </View>
+            {winEntries.length === 0 ? (
+              <Text style={styles.winJournalEmpty}>No wins recorded yet. Start capturing the good stuff!</Text>
+            ) : (
+              <ScrollView style={styles.winJournalList}>
+                {winEntries.slice(0, 10).map(entry => (
+                  <View key={entry.id} style={styles.winEntry}>
+                    <Text style={styles.winEntryText}>{entry.content}</Text>
+                    <Text style={styles.winEntryDate}>{getRelativeTime(entry.timestamp)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={styles.winJournalAdd} onPress={() => { setCurrentWinPrompt(WIN_JOURNAL_PROMPTS[Math.floor(Math.random() * WIN_JOURNAL_PROMPTS.length)]); setShowAddWin(true); }}>
+              <Text style={styles.winJournalAddText}>+ Add a win</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 34: Task Swap
+  if (showTaskSwap && swapSuggestion) {
+    return (
+      <SafeAreaView style={[styles.container, bodyDoubleMode && styles.bodyDoubleContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.swapContainer}>
+          <View style={styles.swapCard}>
+            <Text style={styles.swapTitle}>Stuck? Try switching</Text>
+            <Text style={styles.swapMessage}>{TASK_SWAP_MESSAGES[Math.floor(Math.random() * TASK_SWAP_MESSAGES.length)]}</Text>
+            <View style={styles.swapTaskCard}>
+              <Text style={styles.swapTaskText}>{swapSuggestion.description}</Text>
+            </View>
+            <View style={styles.swapActions}>
+              <TouchableOpacity style={styles.swapButton} onPress={() => setShowTaskSwap(false)}>
+                <Text style={styles.swapButtonText}>Stay on current</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.swapButton, styles.swapButtonPrimary]} onPress={acceptTaskSwap}>
+                <Text style={styles.swapButtonTextPrimary}>Switch to this</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 35: Overdue Commitments
+  if (overdueCommitments.length > 0 && !showCommitments) {
+    const commitment = overdueCommitments[0];
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.commitmentContainer}>
+          <View style={styles.commitmentCard}>
+            <Text style={styles.commitmentTitle}>Commitment check</Text>
+            <Text style={styles.commitmentMessage}>"{commitment.description}"</Text>
+            <Text style={styles.commitmentDeadline}>Was due: {new Date(commitment.deadline).toLocaleDateString()}</Text>
+            <View style={styles.commitmentActions}>
+              <TouchableOpacity style={styles.commitmentButton} onPress={() => resolveCommitment(commitment.id, false)}>
+                <Text style={styles.commitmentButtonText}>Didn't happen</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.commitmentButton, styles.commitmentButtonPrimary]} onPress={() => resolveCommitment(commitment.id, true)}>
+                <Text style={styles.commitmentButtonTextPrimary}>I did it!</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 15: Crisis Mode
+  if (crisisMode) {
+    return (
+      <SafeAreaView style={[styles.container, styles.crisisContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.crisisContent}>
+          <Text style={styles.crisisTitle}>Everything can wait.</Text>
+          <Text style={styles.crisisSubtitle}>Let's just breathe together.</Text>
+
+          <View style={styles.breathingCircleContainer}>
+            <Animated.View style={[styles.breathingCircle, breathingPhase === 'inhale' && styles.breathingInhale, breathingPhase === 'exhale' && styles.breathingExhale]}>
+              <Text style={styles.breathingText}>
+                {breathingPhase === 'inhale' ? 'Breathe in...' : breathingPhase === 'hold' ? 'Hold...' : 'Breathe out...'}
+              </Text>
+            </Animated.View>
+          </View>
+
+          <Text style={styles.breathingCount}>{breathingCount} breaths</Text>
+
+          {breathingCount >= 5 && (
+            <TouchableOpacity style={styles.crisisExitButton} onPress={exitCrisisMode}>
+              <Text style={styles.crisisExitText}>I'm feeling better</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={styles.crisisSkipButton} onPress={exitCrisisMode}>
+            <Text style={styles.crisisSkipText}>Exit</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 7: RSD Support
+  if (showRSDSupport) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.rsdContainer}>
+          <View style={styles.rsdCard}>
+            <Text style={styles.rsdTitle}>I noticed something</Text>
+            <Text style={styles.rsdMessage}>{RSD_SUPPORT_MESSAGES[Math.floor(Math.random() * RSD_SUPPORT_MESSAGES.length)]}</Text>
+
+            <View style={styles.rsdActions}>
+              <TouchableOpacity style={styles.rsdButton} onPress={() => handleRSDSupport('talk')}>
+                <Text style={styles.rsdButtonText}>Let's talk</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.rsdButton} onPress={() => handleRSDSupport('reframe')}>
+                <Text style={styles.rsdButtonText}>Help me reframe</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.rsdDismiss} onPress={() => handleRSDSupport('dismiss')}>
+              <Text style={styles.rsdDismissText}>I'm okay, thanks</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 4: Emotion/Context Tagging
+  if (showEmotionTag) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.emotionContainer}>
+          <View style={styles.emotionCard}>
+            <Text style={styles.emotionTitle}>What's going on?</Text>
+            <Text style={styles.emotionSubtitle}>This helps me understand and support you better</Text>
+
+            <Text style={styles.emotionSectionLabel}>How are you feeling?</Text>
+            <View style={styles.tagGrid}>
+              {EMOTION_TAGS.map(tag => (
+                <TouchableOpacity key={tag} style={[styles.tag, selectedEmotionTags.includes(tag) && styles.tagSelected]} onPress={() => toggleEmotionTag(tag)}>
+                  <Text style={[styles.tagText, selectedEmotionTags.includes(tag) && styles.tagTextSelected]}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.emotionSectionLabel}>Any context?</Text>
+            <View style={styles.tagGrid}>
+              {CONTEXT_TAGS.map(tag => (
+                <TouchableOpacity key={tag} style={[styles.tag, selectedContextTags.includes(tag) && styles.tagSelected]} onPress={() => toggleContextTag(tag)}>
+                  <Text style={[styles.tagText, selectedContextTags.includes(tag) && styles.tagTextSelected]}>{tag}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.emotionActions}>
+              <TouchableOpacity style={styles.emotionSkip} onPress={() => { setShowEmotionTag(false); handleEnergySubmit(currentEnergy || 2, 'low', true); }}>
+                <Text style={styles.emotionSkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.emotionSubmit} onPress={handleEmotionTagComplete}>
+                <Text style={styles.emotionSubmitText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 6: Hyperfocus Warning
+  if (hyperfocusWarning && bodyDoubleMode) {
+    const checkInMessage = HYPERFOCUS_CHECK_INS[Math.floor(Math.random() * HYPERFOCUS_CHECK_INS.length)];
+    return (
+      <SafeAreaView style={[styles.container, styles.bodyDoubleContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.hyperfocusCard}>
+          <Text style={styles.hyperfocusTitle}>Deep focus check-in</Text>
+          <Text style={styles.hyperfocusMessage}>{checkInMessage}</Text>
+
+          <View style={styles.hyperfocusActions}>
+            <TouchableOpacity style={styles.hyperfocusButton} onPress={() => handleHyperfocusResponse('continue')}>
+              <Text style={styles.hyperfocusButtonText}>I'm good, keep going</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hyperfocusButton} onPress={() => handleHyperfocusResponse('break')}>
+              <Text style={styles.hyperfocusButtonText}>Take a break</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.hyperfocusButton} onPress={() => handleHyperfocusResponse('end')}>
+              <Text style={styles.hyperfocusButtonText}>I'm done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 5: Transition Support
+  if (showTransitionSupport) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.transitionContainer}>
+          <View style={styles.transitionCard}>
+            <Text style={styles.transitionTitle}>Nice session!</Text>
+            <Text style={styles.transitionMessage}>Before jumping to the next thing, take a moment to transition.</Text>
+
+            <View style={styles.transitionTips}>
+              <Text style={styles.transitionTip}>• Stretch your body</Text>
+              <Text style={styles.transitionTip}>• Get some water</Text>
+              <Text style={styles.transitionTip}>• Look at something far away</Text>
+              <Text style={styles.transitionTip}>• Take 3 deep breaths</Text>
+            </View>
+
+            <TouchableOpacity style={styles.transitionButton} onPress={handleTransitionEnd}>
+              <Text style={styles.transitionButtonText}>I'm ready</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 10: Medication Reminder
+  if (showMedReminder && pendingMedReminder) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.medReminderContainer}>
+          <View style={styles.medReminderCard}>
+            <Text style={styles.medReminderTitle}>Medication Reminder</Text>
+            <Text style={styles.medReminderName}>{pendingMedReminder.name}</Text>
+            <Text style={styles.medReminderMessage}>Just a gentle reminder. No judgment either way.</Text>
+
+            <View style={styles.medReminderActions}>
+              <TouchableOpacity style={styles.medReminderButton} onPress={() => handleMedReminderResponse(false)}>
+                <Text style={styles.medReminderButtonText}>Not now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.medReminderButton, styles.medReminderButtonPrimary]} onPress={() => handleMedReminderResponse(true)}>
+                <Text style={styles.medReminderButtonTextPrimary}>Taken</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 9: Reflection View
+  if (showReflection && reflectionData) {
+    const insight = generateWeeklyInsight(reflectionData);
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.reflectionContainer}>
+          <View style={styles.reflectionCard}>
+            <View style={styles.reflectionHeader}>
+              <Text style={styles.reflectionTitle}>{reflectionData.period === 'week' ? 'This Week' : 'This Month'}</Text>
+              <TouchableOpacity onPress={() => setShowReflection(false)}><Text style={styles.reflectionClose}>✕</Text></TouchableOpacity>
+            </View>
+
+            <Text style={styles.reflectionInsight}>{insight}</Text>
+
+            <View style={styles.reflectionStats}>
+              <View style={styles.reflectionStat}>
+                <Text style={styles.reflectionStatValue}>{reflectionData.tasksCompleted}</Text>
+                <Text style={styles.reflectionStatLabel}>Tasks Done</Text>
+              </View>
+              <View style={styles.reflectionStat}>
+                <Text style={styles.reflectionStatValue}>{formatDurationShort(reflectionData.totalFocusTime)}</Text>
+                <Text style={styles.reflectionStatLabel}>Focus Time</Text>
+              </View>
+              <View style={styles.reflectionStat}>
+                <Text style={styles.reflectionStatValue}>{reflectionData.avgEnergy}/5</Text>
+                <Text style={styles.reflectionStatLabel}>Avg Energy</Text>
+              </View>
+            </View>
+
+            {reflectionData.wins.length > 0 && (
+              <View style={styles.reflectionWins}>
+                <Text style={styles.reflectionWinsTitle}>Wins</Text>
+                {reflectionData.wins.slice(0, 3).map((win, i) => (
+                  <Text key={i} style={styles.reflectionWin}>✓ {win}</Text>
+                ))}
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.reflectionButton} onPress={() => setShowReflection(false)}>
+              <Text style={styles.reflectionButtonText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 13: Done List Celebration
+  if (showDoneList) {
+    const message = generateDoneListMessage(todayCompletedTasks, todayFocusTime, memory.facts.name);
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.doneListContainer}>
+          <View style={styles.doneListCard}>
+            <Text style={styles.doneListTitle}>Today's Wins</Text>
+            <Text style={styles.doneListMessage}>{message}</Text>
+
+            <TouchableOpacity style={styles.doneListButton} onPress={() => setShowDoneList(false)}>
+              <Text style={styles.doneListButtonText}>Thanks, Nero</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 8: Waiting Mode View
+  if (showWaitingMode) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.waitingContainer}>
+          <View style={styles.waitingCard}>
+            <View style={styles.waitingHeader}>
+              <Text style={styles.waitingTitle}>Waiting On</Text>
+              <TouchableOpacity onPress={() => setShowWaitingMode(false)}><Text style={styles.waitingClose}>✕</Text></TouchableOpacity>
+            </View>
+
+            {waitingItems.length === 0 ? (
+              <Text style={styles.waitingEmpty}>Nothing in the waiting queue</Text>
+            ) : (
+              <ScrollView style={styles.waitingList}>
+                {waitingItems.map(item => (
+                  <View key={item.id} style={styles.waitingItem}>
+                    <View style={styles.waitingItemContent}>
+                      <Text style={styles.waitingItemDesc}>{item.description}</Text>
+                      <Text style={styles.waitingItemFor}>From: {item.waitingFor}</Text>
+                      <Text style={styles.waitingItemAge}>{getRelativeTime(item.createdAt)}</Text>
+                    </View>
+                    <View style={styles.waitingItemActions}>
+                      <TouchableOpacity style={styles.waitingItemButton} onPress={() => resolveWaitingItem(item.id, true)}>
+                        <Text style={styles.waitingItemButtonText}>✓</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.waitingItemButton, styles.waitingItemButtonDelete]} onPress={() => resolveWaitingItem(item.id, false)}>
+                        <Text style={styles.waitingItemButtonText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            <TouchableOpacity style={styles.waitingAddButton} onPress={() => setShowAddWaiting(true)}>
+              <Text style={styles.waitingAddButtonText}>+ Add something you're waiting on</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 14: Parallel Tasks View
+  if (showParallelTasks) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.parallelContainer}>
+          <View style={styles.parallelCard}>
+            <View style={styles.parallelHeader}>
+              <Text style={styles.parallelTitle}>Tasks in Flight</Text>
+              <TouchableOpacity onPress={() => setShowParallelTasks(false)}><Text style={styles.parallelClose}>✕</Text></TouchableOpacity>
+            </View>
+
+            <Text style={styles.parallelSubtitle}>{activeTasks.length} task{activeTasks.length !== 1 ? 's' : ''} you're juggling</Text>
+
+            {activeTasks.map(task => (
+              <View key={task.taskId} style={styles.parallelTask}>
+                <View style={[styles.parallelTaskStatus, task.status === 'active' ? styles.parallelTaskActive : styles.parallelTaskPaused]} />
+                <Text style={styles.parallelTaskText}>{task.description}</Text>
+                <TouchableOpacity style={styles.parallelTaskFocus} onPress={() => focusOnTask(task)}>
+                  <Text style={styles.parallelTaskFocusText}>Focus</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            <Text style={styles.parallelHint}>Want to pick one to focus on?</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 12: Sensory Environment Check
+  if (showSensoryCheck) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.sensoryContainer}>
+          <View style={styles.sensoryCard}>
+            <Text style={styles.sensoryTitle}>Environment Check</Text>
+            <Text style={styles.sensorySubtitle}>Is your space helping or hurting?</Text>
+
+            <Text style={styles.sensorySectionLabel}>Lighting</Text>
+            <View style={styles.sensoryOptions}>
+              {SENSORY_OPTIONS.lighting.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.sensoryOption, currentSensorySettings.lighting === opt && styles.sensoryOptionSelected]} onPress={() => setCurrentSensorySettings(prev => ({ ...prev, lighting: opt }))}>
+                  <Text style={[styles.sensoryOptionText, currentSensorySettings.lighting === opt && styles.sensoryOptionTextSelected]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.sensorySectionLabel}>Sound</Text>
+            <View style={styles.sensoryOptions}>
+              {SENSORY_OPTIONS.sound.map(opt => (
+                <TouchableOpacity key={opt} style={[styles.sensoryOption, currentSensorySettings.sound === opt && styles.sensoryOptionSelected]} onPress={() => setCurrentSensorySettings(prev => ({ ...prev, sound: opt }))}>
+                  <Text style={[styles.sensoryOptionText, currentSensorySettings.sound === opt && styles.sensoryOptionTextSelected]}>{opt}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.sensoryActions}>
+              <TouchableOpacity style={styles.sensorySkip} onPress={() => setShowSensoryCheck(false)}>
+                <Text style={styles.sensorySkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sensorySubmit} onPress={handleSensorySubmit}>
+                <Text style={styles.sensorySubmitText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Settings
   if (showSettings) {
     return (
@@ -1395,6 +4021,163 @@ export default function App() {
                 <Text style={styles.bodyDoubleButtonText}>🧘 Start Focus Session</Text>
               </TouchableOpacity>
               <Text style={styles.settingsHint}>Nero stays with you while you work, with gentle check-ins</Text>
+            </View>
+
+            {/* Feature 11: External Motivation Mode */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>External Motivation Mode</Text>
+              <TouchableOpacity style={styles.toggleRow} onPress={toggleExternalMotivation}>
+                <Text style={styles.toggleLabel}>Get prompts every 10 min</Text>
+                <View style={[styles.toggle, externalMotivationMode && styles.toggleOn]}><View style={[styles.toggleThumb, externalMotivationMode && styles.toggleThumbOn]} /></View>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>For when internal motivation is gone</Text>
+            </View>
+
+            {/* Feature 8: Waiting Mode */}
+            {waitingItems.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Waiting On ({waitingItems.length})</Text>
+                <TouchableOpacity style={styles.waitingPreview} onPress={() => { setShowSettings(false); setShowWaitingMode(true); }}>
+                  <Text style={styles.waitingPreviewText}>{waitingItems[0].description}</Text>
+                  {waitingItems.length > 1 && <Text style={styles.waitingPreviewMore}>+{waitingItems.length - 1} more</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature 14: Parallel Tasks */}
+            {activeTasks.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Tasks in Flight ({activeTasks.length})</Text>
+                <TouchableOpacity style={styles.parallelPreview} onPress={() => { setShowSettings(false); setShowParallelTasks(true); }}>
+                  {activeTasks.slice(0, 2).map(t => (
+                    <Text key={t.taskId} style={styles.parallelPreviewText}>• {t.description}</Text>
+                  ))}
+                  {activeTasks.length > 2 && <Text style={styles.parallelPreviewMore}>+{activeTasks.length - 2} more</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature 9: Reflection */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Reflection</Text>
+              <View style={styles.reflectionButtons}>
+                <TouchableOpacity style={styles.reflectionPreviewButton} onPress={() => { setShowSettings(false); loadReflection('week'); }}>
+                  <Text style={styles.reflectionPreviewButtonText}>This Week</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.reflectionPreviewButton} onPress={() => { setShowSettings(false); loadReflection('month'); }}>
+                  <Text style={styles.reflectionPreviewButtonText}>This Month</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Feature 13: Done List */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.doneListPreview} onPress={() => { setShowSettings(false); setShowDoneList(true); }}>
+                <Text style={styles.doneListPreviewText}>🎉 See Today's Wins</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 12: Sensory Check */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.sensoryPreview} onPress={() => { setShowSettings(false); setShowSensoryCheck(true); }}>
+                <Text style={styles.sensoryPreviewText}>🌿 Environment Check</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 17: Decision Helper */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); handleDecisionHelp(); }}>
+                <Text style={styles.featureButtonText}>🎲 Decide for me</Text>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>Too many choices? Let Nero pick.</Text>
+            </View>
+
+            {/* Feature 18: Dopamine Menu */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowDopamineMenu(true); }}>
+                <Text style={styles.featureButtonText}>🍭 Dopamine Menu</Text>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>Quick healthy rewards</Text>
+            </View>
+
+            {/* Feature 20: Emotional Check-in */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowEmotionalCheck(true); }}>
+                <Text style={styles.featureButtonText}>💭 Emotional Check-in</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 22: Impulse Buffer */}
+            {delayedImpulses.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Impulse Buffer ({delayedImpulses.length})</Text>
+                <TouchableOpacity style={styles.featurePreview} onPress={() => { setShowSettings(false); setShowImpulseBuffer(true); }}>
+                  <Text style={styles.featurePreviewText}>{delayedImpulses[0].description}</Text>
+                  {delayedImpulses.length > 1 && <Text style={styles.featurePreviewMore}>+{delayedImpulses.length - 1} more waiting</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature 23: Social Battery */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Social Battery</Text>
+              <View style={styles.batteryRow}>
+                <View style={styles.batteryIndicatorSmall}>
+                  <View style={[styles.batteryLevelSmall, { width: `${socialBattery * 10}%`, backgroundColor: socialBattery > 5 ? COLORS.accent : socialBattery > 2 ? COLORS.warning : COLORS.delete }]} />
+                </View>
+                <Text style={styles.batteryText}>{socialBattery}/10</Text>
+                <TouchableOpacity onPress={() => { setShowSettings(false); setShowLogSocial(true); }}>
+                  <Text style={styles.updateLink}>Log interaction</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Feature 25: Relationship Reminders */}
+            {overdueContacts.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>People to reach out to</Text>
+                {overdueContacts.slice(0, 3).map(r => (
+                  <View key={r.id} style={styles.relationshipRow}>
+                    <Text style={styles.relationshipName}>{r.personName}</Text>
+                    <TouchableOpacity onPress={() => markContactMade(r.id)}>
+                      <Text style={styles.relationshipAction}>Mark contacted</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Feature 32: Win Journal */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowWinJournal(true); }}>
+                <Text style={styles.featureButtonText}>🏆 Win Journal ({winEntries.length})</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 33: Sensory Overload Mode */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.toggleRow} onPress={toggleSensoryOverload}>
+                <Text style={styles.toggleLabel}>Sensory Overload Mode</Text>
+                <View style={[styles.toggle, sensoryOverloadMode && styles.toggleOn]}><View style={[styles.toggleThumb, sensoryOverloadMode && styles.toggleThumbOn]} /></View>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>Simplified, calmer UI</Text>
+            </View>
+
+            {/* Feature 31: Quiet Hours */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.toggleRow} onPress={() => setQuietHours(prev => ({ ...prev, enabled: !prev.enabled }))}>
+                <Text style={styles.toggleLabel}>Quiet Hours ({quietHours.startTime} - {quietHours.endTime})</Text>
+                <View style={[styles.toggle, quietHours.enabled && styles.toggleOn]}><View style={[styles.toggleThumb, quietHours.enabled && styles.toggleThumbOn]} /></View>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>No check-ins during these hours</Text>
+            </View>
+
+            {/* Feature 35: Commitments */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Commitments ({commitments.length})</Text>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowAddCommitment(true); }}>
+                <Text style={styles.featureButtonText}>+ Make a commitment</Text>
+              </TouchableOpacity>
             </View>
 
             <View style={styles.settingsSection}>
@@ -1480,6 +4263,20 @@ export default function App() {
           <View style={styles.focusTaskBanner}>
             <Text style={styles.focusTaskLabel}>Working on:</Text>
             <Text style={styles.focusTaskText}>{bodyDoubleSession.taskDescription}</Text>
+          </View>
+        )}
+
+        {/* Feature 11: External Motivation Mode Banner */}
+        {externalMotivationMode && !bodyDoubleMode && currentMotivationPrompt && (
+          <View style={styles.motivationBanner}>
+            <Text style={styles.motivationBannerText}>{currentMotivationPrompt}</Text>
+          </View>
+        )}
+
+        {/* Feature 1: Upcoming Time Block Banner */}
+        {upcomingBlock && !bodyDoubleMode && (
+          <View style={[styles.motivationBanner, { backgroundColor: COLORS.suggestion + '20', borderBottomColor: COLORS.suggestion + '40' }]}>
+            <Text style={[styles.motivationBannerText, { color: COLORS.suggestion }]}>Coming up: {upcomingBlock.title} at {upcomingBlock.startTime}</Text>
           </View>
         )}
 
@@ -1709,4 +4506,356 @@ const styles = StyleSheet.create({
   taskItemSwipingDelete: { backgroundColor: COLORS.delete + '30' },
   taskItemText: { color: COLORS.text, fontSize: 15, flex: 1, marginRight: 10 },
   taskItemAge: { color: COLORS.textDim, fontSize: 12 },
+
+  // ============ NEW FEATURE STYLES ============
+
+  // Feature 15: Crisis Mode
+  crisisContainer: { backgroundColor: '#0a0505' },
+  crisisContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
+  crisisTitle: { color: COLORS.text, fontSize: 28, fontWeight: '300', marginBottom: 8, textAlign: 'center' },
+  crisisSubtitle: { color: COLORS.textMuted, fontSize: 18, marginBottom: 48, textAlign: 'center' },
+  breathingCircleContainer: { width: 200, height: 200, justifyContent: 'center', alignItems: 'center', marginBottom: 32 },
+  breathingCircle: { width: 150, height: 150, borderRadius: 75, backgroundColor: COLORS.calm + '30', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.calm },
+  breathingInhale: { transform: [{ scale: 1.3 }] },
+  breathingExhale: { transform: [{ scale: 0.8 }] },
+  breathingText: { color: COLORS.calm, fontSize: 16, fontWeight: '500' },
+  breathingCount: { color: COLORS.textDim, fontSize: 14, marginBottom: 32 },
+  crisisExitButton: { backgroundColor: COLORS.calm, paddingHorizontal: 32, paddingVertical: 16, borderRadius: 12, marginBottom: 16 },
+  crisisExitText: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+  crisisSkipButton: { padding: 12 },
+  crisisSkipText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 7: RSD Support
+  rsdContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  rsdCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  rsdTitle: { color: COLORS.rsd, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  rsdMessage: { color: COLORS.text, fontSize: 20, lineHeight: 28, marginBottom: 24 },
+  rsdActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  rsdButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  rsdButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  rsdDismiss: { padding: 12, alignItems: 'center' },
+  rsdDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 4: Emotion/Context Tagging
+  emotionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emotionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 420 },
+  emotionTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600', marginBottom: 8 },
+  emotionSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 24 },
+  emotionSectionLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 16 },
+  tagGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: { backgroundColor: COLORS.surfaceLight, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  tagSelected: { backgroundColor: COLORS.emotion + '30', borderColor: COLORS.emotion },
+  tagText: { color: COLORS.textMuted, fontSize: 13 },
+  tagTextSelected: { color: COLORS.emotion },
+  emotionActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  emotionSkip: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  emotionSkipText: { color: COLORS.textMuted, fontSize: 16 },
+  emotionSubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.emotion, alignItems: 'center' },
+  emotionSubmitText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+
+  // Feature 6: Hyperfocus Warning
+  hyperfocusCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '90%', maxWidth: 400 },
+  hyperfocusTitle: { color: COLORS.hyperfocus, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  hyperfocusMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 24 },
+  hyperfocusActions: { gap: 12 },
+  hyperfocusButton: { padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  hyperfocusButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 5: Transition Support
+  transitionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  transitionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 380 },
+  transitionTitle: { color: COLORS.transition, fontSize: 20, fontWeight: '600', marginBottom: 8 },
+  transitionMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 20 },
+  transitionTips: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 24 },
+  transitionTip: { color: COLORS.textMuted, fontSize: 14, lineHeight: 24 },
+  transitionButton: { backgroundColor: COLORS.transition, padding: 16, borderRadius: 12, alignItems: 'center' },
+  transitionButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+
+  // Feature 10: Medication Reminder
+  medReminderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  medReminderCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 360 },
+  medReminderTitle: { color: COLORS.medication, fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  medReminderName: { color: COLORS.text, fontSize: 24, fontWeight: '600', marginBottom: 8 },
+  medReminderMessage: { color: COLORS.textMuted, fontSize: 14, marginBottom: 24 },
+  medReminderActions: { flexDirection: 'row', gap: 12 },
+  medReminderButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  medReminderButtonPrimary: { backgroundColor: COLORS.medication },
+  medReminderButtonText: { color: COLORS.textMuted, fontSize: 16, fontWeight: '500' },
+  medReminderButtonTextPrimary: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+
+  // Feature 9: Reflection
+  reflectionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  reflectionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  reflectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  reflectionTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  reflectionClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  reflectionInsight: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 20, backgroundColor: COLORS.reflection + '20', padding: 16, borderRadius: 12, borderLeftWidth: 3, borderLeftColor: COLORS.reflection },
+  reflectionStats: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  reflectionStat: { flex: 1, backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, alignItems: 'center' },
+  reflectionStatValue: { color: COLORS.text, fontSize: 24, fontWeight: '700' },
+  reflectionStatLabel: { color: COLORS.textMuted, fontSize: 11, marginTop: 4 },
+  reflectionWins: { marginBottom: 20 },
+  reflectionWinsTitle: { color: COLORS.accent, fontSize: 14, fontWeight: '600', marginBottom: 8 },
+  reflectionWin: { color: COLORS.text, fontSize: 14, lineHeight: 22 },
+  reflectionButton: { backgroundColor: COLORS.primary, borderRadius: 12, padding: 16, alignItems: 'center' },
+  reflectionButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  reflectionButtons: { flexDirection: 'row', gap: 12 },
+  reflectionPreviewButton: { flex: 1, backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12, alignItems: 'center' },
+  reflectionPreviewButtonText: { color: COLORS.text, fontSize: 14, fontWeight: '500' },
+
+  // Feature 13: Done List
+  doneListContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  doneListCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  doneListTitle: { color: COLORS.celebration, fontSize: 22, fontWeight: '600', marginBottom: 16 },
+  doneListMessage: { color: COLORS.text, fontSize: 16, lineHeight: 26, marginBottom: 24, whiteSpace: 'pre-line' },
+  doneListButton: { backgroundColor: COLORS.celebration, borderRadius: 12, padding: 16, alignItems: 'center' },
+  doneListButtonText: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+  doneListPreview: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  doneListPreviewText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 8: Waiting Mode
+  waitingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  waitingCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, maxHeight: '80%' },
+  waitingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  waitingTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  waitingClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  waitingEmpty: { color: COLORS.textMuted, fontSize: 15, textAlign: 'center', paddingVertical: 32 },
+  waitingList: { maxHeight: 300 },
+  waitingItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 8 },
+  waitingItemContent: { flex: 1 },
+  waitingItemDesc: { color: COLORS.text, fontSize: 15, fontWeight: '500', marginBottom: 4 },
+  waitingItemFor: { color: COLORS.waiting, fontSize: 13 },
+  waitingItemAge: { color: COLORS.textDim, fontSize: 12, marginTop: 2 },
+  waitingItemActions: { flexDirection: 'row', gap: 8 },
+  waitingItemButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.accent, justifyContent: 'center', alignItems: 'center' },
+  waitingItemButtonDelete: { backgroundColor: COLORS.delete },
+  waitingItemButtonText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+  waitingAddButton: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12, alignItems: 'center', marginTop: 12 },
+  waitingAddButtonText: { color: COLORS.waiting, fontSize: 14, fontWeight: '500' },
+  waitingPreview: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12 },
+  waitingPreviewText: { color: COLORS.text, fontSize: 14 },
+  waitingPreviewMore: { color: COLORS.waiting, fontSize: 13, marginTop: 4 },
+
+  // Feature 14: Parallel Tasks
+  parallelContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  parallelCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  parallelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  parallelTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600' },
+  parallelClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  parallelSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  parallelTask: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 10 },
+  parallelTaskStatus: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
+  parallelTaskActive: { backgroundColor: COLORS.accent },
+  parallelTaskPaused: { backgroundColor: COLORS.textDim },
+  parallelTaskText: { flex: 1, color: COLORS.text, fontSize: 15 },
+  parallelTaskFocus: { backgroundColor: COLORS.parallel, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  parallelTaskFocusText: { color: COLORS.text, fontSize: 13, fontWeight: '600' },
+  parallelHint: { color: COLORS.textMuted, fontSize: 13, textAlign: 'center', marginTop: 16 },
+  parallelPreview: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12 },
+  parallelPreviewText: { color: COLORS.text, fontSize: 13, lineHeight: 20 },
+  parallelPreviewMore: { color: COLORS.parallel, fontSize: 12, marginTop: 4 },
+
+  // Feature 12: Sensory Environment
+  sensoryContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  sensoryCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  sensoryTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600', marginBottom: 8 },
+  sensorySubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 24 },
+  sensorySectionLabel: { color: COLORS.textMuted, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 16 },
+  sensoryOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sensoryOption: { backgroundColor: COLORS.surfaceLight, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  sensoryOptionSelected: { backgroundColor: COLORS.accent + '30', borderColor: COLORS.accent },
+  sensoryOptionText: { color: COLORS.textMuted, fontSize: 14 },
+  sensoryOptionTextSelected: { color: COLORS.accent },
+  sensoryActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
+  sensorySkip: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  sensorySkipText: { color: COLORS.textMuted, fontSize: 16 },
+  sensorySubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.accent, alignItems: 'center' },
+  sensorySubmitText: { color: COLORS.bg, fontSize: 16, fontWeight: '600' },
+  sensoryPreview: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  sensoryPreviewText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 11: External Motivation (uses existing toggle styles)
+  motivationBanner: { backgroundColor: COLORS.motivation + '20', padding: 14, borderBottomWidth: 1, borderBottomColor: COLORS.motivation + '40' },
+  motivationBannerText: { color: COLORS.motivation, fontSize: 14, textAlign: 'center' },
+
+  // ============ FEATURES 16-35 STYLES ============
+
+  // Feature 16: Recovery
+  recoveryContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  recoveryCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  recoveryTitle: { color: COLORS.recovery, fontSize: 22, fontWeight: '600', marginBottom: 12 },
+  recoveryMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 24 },
+  recoveryActions: { flexDirection: 'row', gap: 12 },
+  recoveryButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  recoveryButtonPrimary: { backgroundColor: COLORS.recovery },
+  recoveryButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  recoveryButtonTextPrimary: { color: COLORS.bg, fontSize: 15, fontWeight: '600' },
+
+  // Feature 17: Decision
+  decisionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  decisionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  decisionTitle: { color: COLORS.decision, fontSize: 22, fontWeight: '600', marginBottom: 12 },
+  decisionMessage: { color: COLORS.textMuted, fontSize: 15, marginBottom: 20 },
+  decisionTaskCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 18, marginBottom: 24, borderLeftWidth: 3, borderLeftColor: COLORS.decision },
+  decisionTaskText: { color: COLORS.text, fontSize: 18, fontWeight: '500' },
+  decisionActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  decisionButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  decisionButtonPrimary: { backgroundColor: COLORS.decision },
+  decisionButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  decisionButtonTextPrimary: { color: COLORS.bg, fontSize: 15, fontWeight: '600' },
+  decisionDismiss: { padding: 12, alignItems: 'center' },
+  decisionDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 18: Dopamine Menu
+  dopamineContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dopamineCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, maxHeight: '80%' },
+  dopamineTitle: { color: COLORS.dopamine, fontSize: 22, fontWeight: '600', marginBottom: 4 },
+  dopamineSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  dopamineList: { maxHeight: 300 },
+  dopamineItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 10 },
+  dopamineItemName: { color: COLORS.text, fontSize: 15, flex: 1 },
+  dopamineItemDuration: { color: COLORS.dopamine, fontSize: 13, fontWeight: '600' },
+  dopamineDismiss: { padding: 12, alignItems: 'center', marginTop: 8 },
+  dopamineDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 19: Time Anchor
+  timeAnchorCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '90%', maxWidth: 380 },
+  timeAnchorTitle: { color: COLORS.timeBlinds, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  timeAnchorMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 24 },
+  timeAnchorButton: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  timeAnchorButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 20: Emotional Check
+  emotionalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emotionalCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 420 },
+  emotionalTitle: { color: COLORS.emotional, fontSize: 22, fontWeight: '600', marginBottom: 4 },
+  emotionalSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  emotionalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  emotionalOption: { backgroundColor: COLORS.surfaceLight, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  emotionalOptionSelected: { backgroundColor: COLORS.emotional + '30', borderColor: COLORS.emotional },
+  emotionalOptionText: { color: COLORS.textMuted, fontSize: 14 },
+  emotionalOptionTextSelected: { color: COLORS.emotional },
+  intensitySlider: { marginBottom: 20 },
+  intensityLabel: { color: COLORS.textMuted, fontSize: 13, marginBottom: 10 },
+  intensityButtons: { flexDirection: 'row', gap: 8 },
+  intensityButton: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  intensityButtonSelected: { backgroundColor: COLORS.emotional },
+  intensityButtonText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  emotionalActions: { flexDirection: 'row', gap: 12 },
+  emotionalSkip: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  emotionalSkipText: { color: COLORS.textMuted, fontSize: 16 },
+  emotionalSubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.emotional, alignItems: 'center' },
+  emotionalSubmitDisabled: { opacity: 0.5 },
+  emotionalSubmitText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+
+  // Feature 21: Procrastination
+  procrastinationContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  procrastinationCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  procrastinationTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600', marginBottom: 8 },
+  procrastinationTask: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  procrastinationOptions: { maxHeight: 280 },
+  procrastinationOption: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 10 },
+  procrastinationOptionText: { color: COLORS.text, fontSize: 15 },
+  procrastinationDismiss: { padding: 12, alignItems: 'center', marginTop: 8 },
+  procrastinationDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 22: Impulse Buffer
+  impulseContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  impulseCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  impulseTitle: { color: COLORS.impulse, fontSize: 18, fontWeight: '600', marginBottom: 16 },
+  impulseMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 8 },
+  impulseCost: { color: COLORS.impulse, fontSize: 24, fontWeight: '700', marginBottom: 16 },
+  impulseQuestion: { color: COLORS.textMuted, fontSize: 15, marginBottom: 24 },
+  impulseActions: { flexDirection: 'row', gap: 12 },
+  impulseButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  impulseButtonPrimary: { backgroundColor: COLORS.impulse },
+  impulseButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  impulseButtonTextPrimary: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+
+  // Feature 23: Social Battery
+  socialContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  socialCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 380 },
+  socialTitle: { color: COLORS.social, fontSize: 20, fontWeight: '600', marginBottom: 16 },
+  batteryIndicator: { height: 20, backgroundColor: COLORS.surfaceLight, borderRadius: 10, marginBottom: 16, overflow: 'hidden' },
+  batteryLevel: { height: '100%', backgroundColor: COLORS.delete, borderRadius: 10 },
+  socialMessage: { color: COLORS.text, fontSize: 15, lineHeight: 22, marginBottom: 24 },
+  socialButton: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  socialButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  batteryIndicatorSmall: { flex: 1, height: 12, backgroundColor: COLORS.surfaceLight, borderRadius: 6, overflow: 'hidden' },
+  batteryLevelSmall: { height: '100%', borderRadius: 6 },
+  batteryText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+
+  // Feature 24: Rumination
+  ruminationContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  ruminationCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  ruminationTitle: { color: COLORS.rumination, fontSize: 20, fontWeight: '600', marginBottom: 12 },
+  ruminationMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 24 },
+  ruminationActions: { gap: 10, marginBottom: 16 },
+  ruminationButton: { padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  ruminationButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  ruminationDismiss: { padding: 12, alignItems: 'center' },
+  ruminationDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 25: Relationships
+  relationshipRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  relationshipName: { color: COLORS.text, fontSize: 15 },
+  relationshipAction: { color: COLORS.relationship, fontSize: 14 },
+
+  // Feature 27: Shame
+  shameContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  shameCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  shameTitle: { color: COLORS.shame, fontSize: 20, fontWeight: '600', marginBottom: 12 },
+  shameMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 24 },
+  shameActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  shameButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  shameButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  shameDismiss: { padding: 12, alignItems: 'center' },
+  shameDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 32: Win Journal
+  winJournalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  winJournalCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, maxHeight: '80%' },
+  winJournalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  winJournalTitle: { color: COLORS.wins, fontSize: 22, fontWeight: '600' },
+  winJournalClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  winJournalEmpty: { color: COLORS.textMuted, fontSize: 15, textAlign: 'center', paddingVertical: 32 },
+  winJournalList: { maxHeight: 300 },
+  winEntry: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 10 },
+  winEntryText: { color: COLORS.text, fontSize: 15, marginBottom: 4 },
+  winEntryDate: { color: COLORS.textDim, fontSize: 12 },
+  winJournalAdd: { backgroundColor: COLORS.wins + '20', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 12 },
+  winJournalAddText: { color: COLORS.wins, fontSize: 15, fontWeight: '600' },
+
+  // Feature 34: Task Swap
+  swapContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  swapCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  swapTitle: { color: COLORS.swap, fontSize: 20, fontWeight: '600', marginBottom: 8 },
+  swapMessage: { color: COLORS.textMuted, fontSize: 15, marginBottom: 20 },
+  swapTaskCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 18, marginBottom: 24, borderLeftWidth: 3, borderLeftColor: COLORS.swap },
+  swapTaskText: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
+  swapActions: { flexDirection: 'row', gap: 12 },
+  swapButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  swapButtonPrimary: { backgroundColor: COLORS.swap },
+  swapButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  swapButtonTextPrimary: { color: COLORS.bg, fontSize: 15, fontWeight: '600' },
+
+  // Feature 35: Commitments
+  commitmentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  commitmentCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  commitmentTitle: { color: COLORS.commitment, fontSize: 18, fontWeight: '600', marginBottom: 16 },
+  commitmentMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 8 },
+  commitmentDeadline: { color: COLORS.textDim, fontSize: 14, marginBottom: 24 },
+  commitmentActions: { flexDirection: 'row', gap: 12 },
+  commitmentButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  commitmentButtonPrimary: { backgroundColor: COLORS.commitment },
+  commitmentButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  commitmentButtonTextPrimary: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+
+  // Settings - New Feature Buttons
+  featureButton: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  featureButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  featurePreview: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12 },
+  featurePreviewText: { color: COLORS.text, fontSize: 14 },
+  featurePreviewMore: { color: COLORS.textMuted, fontSize: 12, marginTop: 4 },
 });
