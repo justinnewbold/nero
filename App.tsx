@@ -195,6 +195,135 @@ interface ActiveTask {
   status: 'active' | 'paused';
 }
 
+// ============ FEATURES 16-35 TYPES ============
+
+// Feature 16: Where Was I Recovery Mode
+interface SessionContext {
+  lastActiveTask?: string;
+  lastTopic?: string;
+  lastActivity: string;
+  awayDuration: number;
+}
+
+// Feature 17: Decision Fatigue Helper
+interface DecisionRequest {
+  options: string[];
+  context?: string;
+  timestamp: string;
+}
+
+// Feature 18: Dopamine Menu
+interface DopamineActivity {
+  id: string;
+  name: string;
+  category: 'movement' | 'sensory' | 'social' | 'creative' | 'rest';
+  duration: number; // minutes
+  lastUsed?: string;
+  effectiveness?: number; // 1-5
+}
+
+// Feature 20: Emotional Regulation
+interface EmotionalState {
+  emotion: string;
+  intensity: number; // 1-5
+  timestamp: string;
+  triggers?: string[];
+  copingUsed?: string;
+}
+
+// Feature 22: Impulse Delay Buffer
+interface DelayedImpulse {
+  id: string;
+  description: string;
+  category: 'purchase' | 'decision' | 'action';
+  createdAt: string;
+  delayUntil: string;
+  status: 'waiting' | 'approved' | 'dismissed';
+  estimatedCost?: number;
+}
+
+// Feature 23: Social Battery
+interface SocialInteraction {
+  id: string;
+  type: 'meeting' | 'call' | 'in-person' | 'message';
+  duration: number; // minutes
+  energyCost: number; // 1-5
+  timestamp: string;
+  notes?: string;
+}
+
+// Feature 25: Object Permanence / Relationship Tracking
+interface RelationshipReminder {
+  id: string;
+  personName: string;
+  relationship: string;
+  lastContact?: string;
+  preferredFrequency: number; // days
+  notes?: string;
+}
+
+// Feature 26: Flexible Routines
+interface FlexibleRoutine {
+  id: string;
+  name: string;
+  timeOfDay: 'morning' | 'evening';
+  items: RoutineCheckItem[];
+  minItemsForSuccess: number; // "good enough" threshold
+  streak: number;
+  lastCompleted?: string;
+}
+
+interface RoutineCheckItem {
+  id: string;
+  name: string;
+  optional: boolean;
+  completed: boolean;
+}
+
+// Feature 28: Interest-Based Task Tracking
+interface TaskCompletionPattern {
+  taskKeywords: string[];
+  avgCompletionTime: number;
+  completionRate: number;
+  energyWhenCompleted: number;
+}
+
+// Feature 29: Deadline Scaffolding
+interface Milestone {
+  id: string;
+  parentTaskId: string;
+  description: string;
+  dueDate: string;
+  status: 'pending' | 'completed';
+}
+
+// Feature 31: Quiet Hours
+interface QuietHours {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+  days: number[];
+  allowUrgent: boolean;
+}
+
+// Feature 32: Win Journal
+interface WinEntry {
+  id: string;
+  content: string;
+  timestamp: string;
+  category?: 'task' | 'personal' | 'health' | 'social';
+}
+
+// Feature 35: Commitment Device
+interface Commitment {
+  id: string;
+  description: string;
+  deadline: string;
+  witness?: string; // accountability partner name
+  status: 'active' | 'kept' | 'broken';
+  createdAt: string;
+}
+
 // ============ CONSTANTS ============
 const COLORS = {
   bg: '#0a0a0f',
@@ -232,6 +361,27 @@ const COLORS = {
   rsd: '#f472b6',
   parallel: '#06b6d4',
   celebration: '#fbbf24',
+  // Features 16-35 colors
+  recovery: '#38bdf8',
+  decision: '#a78bfa',
+  dopamine: '#fb923c',
+  timeBlinds: '#facc15',
+  emotional: '#f472b6',
+  procrastination: '#94a3b8',
+  impulse: '#f43f5e',
+  social: '#2dd4bf',
+  rumination: '#c084fc',
+  relationship: '#fb7185',
+  routine: '#4ade80',
+  shame: '#fda4af',
+  interest: '#60a5fa',
+  deadline: '#f87171',
+  accountability: '#34d399',
+  quiet: '#475569',
+  wins: '#fcd34d',
+  overload: '#64748b',
+  swap: '#22d3ee',
+  commitment: '#e879f9',
 };
 
 const ENERGY_COLORS = [COLORS.energy1, COLORS.energy2, COLORS.energy3, COLORS.energy4, COLORS.energy5];
@@ -303,6 +453,112 @@ const CELEBRATION_MESSAGES = [
   "You showed up. That's huge.",
   "Progress, not perfection. And you made progress.",
   "Your effort counts even when it doesn't feel like it.",
+];
+
+// ============ FEATURES 16-35 CONSTANTS ============
+
+// Feature 16: Where Was I Recovery
+const RECOVERY_MESSAGES = [
+  "Welcome back! You were working on: ",
+  "Hey, you're back! Last time you were focused on: ",
+  "Good to see you! Before you left, you were: ",
+];
+
+// Feature 17: Decision Fatigue
+const DECISION_PROMPTS = [
+  "Decision fatigue is real. Let me pick for you.",
+  "Too many choices? I've got you.",
+  "Your brain is tired of deciding. Here's what to do: ",
+];
+
+// Feature 18: Dopamine Menu
+const DEFAULT_DOPAMINE_ACTIVITIES: DopamineActivity[] = [
+  { id: '1', name: 'Take a short walk', category: 'movement', duration: 10 },
+  { id: '2', name: 'Listen to a favorite song', category: 'sensory', duration: 5 },
+  { id: '3', name: 'Have a healthy snack', category: 'rest', duration: 5 },
+  { id: '4', name: 'Do 10 jumping jacks', category: 'movement', duration: 2 },
+  { id: '5', name: 'Text a friend', category: 'social', duration: 5 },
+  { id: '6', name: 'Doodle for 5 minutes', category: 'creative', duration: 5 },
+  { id: '7', name: 'Step outside for fresh air', category: 'sensory', duration: 5 },
+  { id: '8', name: 'Watch one funny video', category: 'rest', duration: 3 },
+  { id: '9', name: 'Stretch your body', category: 'movement', duration: 5 },
+  { id: '10', name: 'Play with a fidget toy', category: 'sensory', duration: 5 },
+];
+
+// Feature 19: Time Blindness Anchors
+const TIME_ANCHOR_MESSAGES = [
+  "Quick time check: it's been {duration} since you started.",
+  "Time anchor: {duration} have passed.",
+  "Gentle reminder: you've been at this for {duration}.",
+];
+
+// Feature 20: Emotional Regulation
+const EMOTION_OPTIONS = ['anxious', 'frustrated', 'sad', 'angry', 'overwhelmed', 'numb', 'restless', 'hopeful', 'calm', 'excited'];
+const COPING_STRATEGIES = {
+  anxious: ['Deep breathing', 'Ground yourself (5-4-3-2-1)', 'Write worries down', 'Talk to someone'],
+  frustrated: ['Take a break', 'Physical movement', 'Vent (write or talk)', 'Change tasks'],
+  sad: ['Be gentle with yourself', 'Reach out to someone', 'Do something comforting', 'It\'s okay to rest'],
+  angry: ['Step away', 'Physical release', 'Write it out', 'Wait before responding'],
+  overwhelmed: ['One thing at a time', 'Breathe', 'Simplify', 'Ask for help'],
+  numb: ['Gentle movement', 'Sensory input', 'Connect with someone', 'Don\'t force it'],
+  restless: ['Move your body', 'Change scenery', 'Fidget freely', 'Channel into task'],
+  hopeful: ['Capture this feeling', 'Use momentum', 'Share with someone', 'Plan something'],
+  calm: ['Enjoy it', 'Do meaningful work', 'Reflect', 'Help someone'],
+  excited: ['Channel it', 'Write ideas down', 'Share the energy', 'Start something'],
+};
+
+// Feature 21: Procrastination Buddy
+const PROCRASTINATION_BLOCKERS = [
+  { label: 'Too big/overwhelming', suggestion: "Let's break it into tiny pieces" },
+  { label: 'Boring/uninteresting', suggestion: "Can we make it more fun or pair it with something?" },
+  { label: 'Unclear what to do', suggestion: "Let's figure out the first concrete step" },
+  { label: 'Scared of failing', suggestion: "Done is better than perfect. What's the minimum?" },
+  { label: 'Waiting for motivation', suggestion: "Motivation comes after starting. Just 2 minutes?" },
+  { label: "Don't know why it matters", suggestion: "What happens if you don't do it? Is that okay?" },
+];
+
+// Feature 24: Rumination Detection
+const RUMINATION_PATTERNS = [
+  /i keep thinking about/i, /can't stop thinking/i, /over and over/i,
+  /why did i/i, /should have/i, /what if i had/i, /i always/i, /i never/i,
+  /everyone thinks/i, /nobody understands/i, /it's always/i,
+];
+
+// Feature 27: Shame Spiral Detection
+const SHAME_PATTERNS = [
+  /i'm so stupid/i, /i'm the worst/i, /i can't do anything/i, /what's wrong with me/i,
+  /i should be able to/i, /why can't i just/i, /everyone else can/i, /i'm broken/i,
+  /i'm a mess/i, /i'm useless/i, /i hate myself/i, /i'm such a/i,
+];
+
+const SHAME_RESPONSES = [
+  "Hey, that's a lot of 'should'. ADHD brains work differently, not wrong.",
+  "I hear you being hard on yourself. What would you say to a friend?",
+  "Those thoughts feel true but they're not facts. Let's slow down.",
+  "Your brain is being mean to you right now. That's not fair or accurate.",
+];
+
+// Feature 30: Just Watch Me - Accountability Modes
+const ACCOUNTABILITY_MODES = [
+  { id: 'silent', name: 'Silent presence', description: "I'm just here. No check-ins." },
+  { id: 'gentle', name: 'Gentle check-ins', description: 'Occasional "how\'s it going?"' },
+  { id: 'active', name: 'Active accountability', description: 'Regular progress updates' },
+];
+
+// Feature 32: Win Journal Prompts
+const WIN_JOURNAL_PROMPTS = [
+  "What went well today?",
+  "What's one thing you're proud of?",
+  "What did you do that was hard?",
+  "How did you take care of yourself?",
+  "What made you smile today?",
+];
+
+// Feature 34: Task Swap Suggestions
+const TASK_SWAP_MESSAGES = [
+  "Stuck on this one? Maybe try something else for a bit.",
+  "Not feeling it? Here's another option:",
+  "Sometimes a different task unsticks the brain:",
 ];
 
 const NERO_SYSTEM_PROMPT = `You are Nero, an AI companion for someone with ADHD. Warm, direct, no judgment.
@@ -474,6 +730,160 @@ const generateWeeklyInsight = (data: ReflectionData): string => {
   }
 
   return insights.join(' ');
+};
+
+// ============ FEATURES 16-35 HELPERS ============
+
+// Feature 16: Where Was I - Calculate away duration
+const calculateAwayDuration = (lastSeen: string): number => {
+  return (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60); // minutes
+};
+
+const shouldShowRecovery = (lastSeen: string): boolean => {
+  const awayMinutes = calculateAwayDuration(lastSeen);
+  return awayMinutes >= 30; // Show recovery if away 30+ minutes
+};
+
+// Feature 17: Decision Helper - Random picker
+const pickRandomTask = (tasks: Task[]): Task | null => {
+  if (tasks.length === 0) return null;
+  return tasks[Math.floor(Math.random() * tasks.length)];
+};
+
+// Feature 19: Time Blindness - Format session duration
+const formatTimeAnchor = (startTime: string): string => {
+  const duration = Date.now() - new Date(startTime).getTime();
+  const minutes = Math.floor(duration / 60000);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours} hour${hours > 1 ? 's' : ''} and ${minutes % 60} minute${minutes % 60 !== 1 ? 's' : ''}`;
+  }
+  return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+};
+
+// Feature 23: Social Battery Calculator
+const calculateSocialBattery = (interactions: SocialInteraction[]): number => {
+  const today = new Date().setHours(0, 0, 0, 0);
+  const todayInteractions = interactions.filter(i => new Date(i.timestamp).setHours(0, 0, 0, 0) === today);
+  const totalDrain = todayInteractions.reduce((sum, i) => sum + i.energyCost, 0);
+  const maxBattery = 10;
+  return Math.max(0, maxBattery - totalDrain);
+};
+
+// Feature 24: Rumination Detection
+const detectRumination = (message: string, recentMessages: Message[]): boolean => {
+  // Check for rumination patterns in current message
+  const hasPattern = RUMINATION_PATTERNS.some(p => p.test(message));
+  if (!hasPattern) return false;
+
+  // Check if similar content appeared recently (last 5 messages)
+  const recentUserMessages = recentMessages.filter(m => m.role === 'user').slice(-5);
+  const messageWords = message.toLowerCase().split(/\s+/);
+
+  let repetitionCount = 0;
+  for (const recent of recentUserMessages) {
+    const recentWords = recent.content.toLowerCase().split(/\s+/);
+    const overlap = messageWords.filter(w => recentWords.includes(w) && w.length > 4).length;
+    if (overlap >= 3) repetitionCount++;
+  }
+
+  return repetitionCount >= 2;
+};
+
+// Feature 25: Check if relationship needs contact
+const needsContact = (reminder: RelationshipReminder): boolean => {
+  if (!reminder.lastContact) return true;
+  const daysSince = (Date.now() - new Date(reminder.lastContact).getTime()) / (1000 * 60 * 60 * 24);
+  return daysSince >= reminder.preferredFrequency;
+};
+
+// Feature 27: Shame Spiral Detection
+const detectShameSpiral = (message: string): boolean => {
+  return SHAME_PATTERNS.some(p => p.test(message));
+};
+
+// Feature 28: Interest-based task matching
+const findInterestBasedTask = (tasks: Task[], completedTasks: Task[]): Task | null => {
+  // Analyze recently completed tasks for patterns
+  const recentCompleted = completedTasks.slice(0, 10);
+  const completedKeywords = new Set<string>();
+
+  recentCompleted.forEach(t => {
+    t.description.toLowerCase().split(/\s+/).forEach(word => {
+      if (word.length > 3) completedKeywords.add(word);
+    });
+  });
+
+  // Find open tasks with similar keywords
+  const matchingTasks = tasks.filter(t => {
+    const taskWords = t.description.toLowerCase().split(/\s+/);
+    return taskWords.some(w => completedKeywords.has(w));
+  });
+
+  return matchingTasks.length > 0 ? matchingTasks[0] : null;
+};
+
+// Feature 29: Auto-generate milestones for deadline
+const generateMilestones = (task: Task, deadline: string): Milestone[] => {
+  const now = Date.now();
+  const deadlineTime = new Date(deadline).getTime();
+  const totalTime = deadlineTime - now;
+  const milestones: Milestone[] = [];
+
+  if (totalTime <= 0) return milestones;
+
+  // Create 3 milestones: 25%, 50%, 75% of time
+  const intervals = [0.25, 0.5, 0.75];
+  const labels = ['Start & outline', 'Main work', 'Review & polish'];
+
+  intervals.forEach((interval, i) => {
+    milestones.push({
+      id: generateId(),
+      parentTaskId: task.id,
+      description: labels[i],
+      dueDate: new Date(now + totalTime * interval).toISOString(),
+      status: 'pending',
+    });
+  });
+
+  return milestones;
+};
+
+// Feature 31: Check if currently in quiet hours
+const isQuietHours = (quietHours: QuietHours): boolean => {
+  if (!quietHours.enabled) return false;
+
+  const now = new Date();
+  const currentDay = now.getDay();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  if (!quietHours.days.includes(currentDay)) return false;
+
+  const [startH, startM] = quietHours.startTime.split(':').map(Number);
+  const [endH, endM] = quietHours.endTime.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+
+  if (startMinutes <= endMinutes) {
+    return currentTime >= startMinutes && currentTime < endMinutes;
+  } else {
+    // Overnight quiet hours
+    return currentTime >= startMinutes || currentTime < endMinutes;
+  }
+};
+
+// Feature 34: Find alternative task for swapping
+const findSwapTask = (currentTask: Task | null, openTasks: Task[]): Task | null => {
+  if (!currentTask) return pickRandomTask(openTasks);
+  const alternatives = openTasks.filter(t => t.id !== currentTask.id);
+  return pickRandomTask(alternatives);
+};
+
+// Feature 35: Check for overdue commitments
+const getOverdueCommitments = (commitments: Commitment[]): Commitment[] => {
+  const now = new Date().toISOString();
+  return commitments.filter(c => c.status === 'active' && c.deadline < now);
 };
 
 // ============ FOCUS ANALYTICS ENGINE ============
@@ -960,6 +1370,119 @@ const SupabaseService = {
   async removeActiveTask(taskId: string): Promise<void> {
     await supabase.from('nero_active_tasks').delete().eq('task_id', taskId);
   },
+
+  // ============ FEATURES 16-35 SERVICE METHODS ============
+
+  // Feature 22: Impulse Delay Buffer
+  async getDelayedImpulses(): Promise<DelayedImpulse[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_delayed_impulses').select('*').eq('user_id', this.userId).eq('status', 'waiting').order('delay_until', { ascending: true });
+    return (data || []).map(i => ({ id: i.id, description: i.description, category: i.category, createdAt: i.created_at, delayUntil: i.delay_until, status: i.status, estimatedCost: i.estimated_cost }));
+  },
+
+  async saveDelayedImpulse(impulse: DelayedImpulse): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_delayed_impulses').upsert({ id: impulse.id, user_id: this.userId, description: impulse.description, category: impulse.category, created_at: impulse.createdAt, delay_until: impulse.delayUntil, status: impulse.status, estimated_cost: impulse.estimatedCost });
+  },
+
+  async updateImpulseStatus(impulseId: string, status: 'approved' | 'dismissed'): Promise<void> {
+    await supabase.from('nero_delayed_impulses').update({ status }).eq('id', impulseId);
+  },
+
+  // Feature 23: Social Battery
+  async logSocialInteraction(interaction: SocialInteraction): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_social_interactions').insert({ id: interaction.id, user_id: this.userId, type: interaction.type, duration: interaction.duration, energy_cost: interaction.energyCost, timestamp: interaction.timestamp, notes: interaction.notes });
+  },
+
+  async getSocialInteractions(days: number = 7): Promise<SocialInteraction[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_social_interactions').select('*').eq('user_id', this.userId).gte('timestamp', since).order('timestamp', { ascending: false });
+    return (data || []).map(s => ({ id: s.id, type: s.type, duration: s.duration, energyCost: s.energy_cost, timestamp: s.timestamp, notes: s.notes }));
+  },
+
+  // Feature 25: Relationship Reminders
+  async getRelationshipReminders(): Promise<RelationshipReminder[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_relationship_reminders').select('*').eq('user_id', this.userId).order('last_contact', { ascending: true });
+    return (data || []).map(r => ({ id: r.id, personName: r.person_name, relationship: r.relationship, lastContact: r.last_contact, preferredFrequency: r.preferred_frequency, notes: r.notes }));
+  },
+
+  async saveRelationshipReminder(reminder: RelationshipReminder): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_relationship_reminders').upsert({ id: reminder.id, user_id: this.userId, person_name: reminder.personName, relationship: reminder.relationship, last_contact: reminder.lastContact, preferred_frequency: reminder.preferredFrequency, notes: reminder.notes });
+  },
+
+  async markContactMade(reminderId: string): Promise<void> {
+    await supabase.from('nero_relationship_reminders').update({ last_contact: new Date().toISOString() }).eq('id', reminderId);
+  },
+
+  // Feature 20: Emotional States
+  async logEmotionalState(state: EmotionalState): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_emotional_states').insert({ user_id: this.userId, emotion: state.emotion, intensity: state.intensity, timestamp: state.timestamp, triggers: state.triggers, coping_used: state.copingUsed });
+  },
+
+  async getEmotionalHistory(days: number = 14): Promise<EmotionalState[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_emotional_states').select('*').eq('user_id', this.userId).gte('timestamp', since).order('timestamp', { ascending: false });
+    return (data || []).map(e => ({ emotion: e.emotion, intensity: e.intensity, timestamp: e.timestamp, triggers: e.triggers, copingUsed: e.coping_used }));
+  },
+
+  // Feature 32: Win Journal
+  async saveWinEntry(entry: WinEntry): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_win_journal').insert({ id: entry.id, user_id: this.userId, content: entry.content, timestamp: entry.timestamp, category: entry.category });
+  },
+
+  async getWinEntries(days: number = 30): Promise<WinEntry[]> {
+    if (!this.userId) return [];
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase.from('nero_win_journal').select('*').eq('user_id', this.userId).gte('timestamp', since).order('timestamp', { ascending: false });
+    return (data || []).map(w => ({ id: w.id, content: w.content, timestamp: w.timestamp, category: w.category }));
+  },
+
+  // Feature 35: Commitments
+  async getCommitments(): Promise<Commitment[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_commitments').select('*').eq('user_id', this.userId).eq('status', 'active').order('deadline', { ascending: true });
+    return (data || []).map(c => ({ id: c.id, description: c.description, deadline: c.deadline, witness: c.witness, status: c.status, createdAt: c.created_at }));
+  },
+
+  async saveCommitment(commitment: Commitment): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_commitments').upsert({ id: commitment.id, user_id: this.userId, description: commitment.description, deadline: commitment.deadline, witness: commitment.witness, status: commitment.status, created_at: commitment.createdAt });
+  },
+
+  async updateCommitmentStatus(commitmentId: string, status: 'kept' | 'broken'): Promise<void> {
+    await supabase.from('nero_commitments').update({ status }).eq('id', commitmentId);
+  },
+
+  // Feature 26: Flexible Routines
+  async getFlexibleRoutines(): Promise<FlexibleRoutine[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_flexible_routines').select('*').eq('user_id', this.userId);
+    return (data || []).map(r => ({ id: r.id, name: r.name, timeOfDay: r.time_of_day, items: r.items || [], minItemsForSuccess: r.min_items_for_success, streak: r.streak || 0, lastCompleted: r.last_completed }));
+  },
+
+  async saveFlexibleRoutine(routine: FlexibleRoutine): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_flexible_routines').upsert({ id: routine.id, user_id: this.userId, name: routine.name, time_of_day: routine.timeOfDay, items: routine.items, min_items_for_success: routine.minItemsForSuccess, streak: routine.streak, last_completed: routine.lastCompleted });
+  },
+
+  // Feature 29: Milestones
+  async getMilestones(taskId: string): Promise<Milestone[]> {
+    if (!this.userId) return [];
+    const { data } = await supabase.from('nero_milestones').select('*').eq('parent_task_id', taskId).order('due_date', { ascending: true });
+    return (data || []).map(m => ({ id: m.id, parentTaskId: m.parent_task_id, description: m.description, dueDate: m.due_date, status: m.status }));
+  },
+
+  async saveMilestone(milestone: Milestone): Promise<void> {
+    if (!this.userId) return;
+    await supabase.from('nero_milestones').upsert({ id: milestone.id, user_id: this.userId, parent_task_id: milestone.parentTaskId, description: milestone.description, due_date: milestone.dueDate, status: milestone.status });
+  },
 };
 
 // ============ AI SERVICE ============
@@ -1255,6 +1778,97 @@ export default function App() {
   const [breathingPhase, setBreathingPhase] = useState<'inhale' | 'hold' | 'exhale'>('inhale');
   const [breathingCount, setBreathingCount] = useState(0);
 
+  // ============ FEATURES 16-35 STATES ============
+
+  // Feature 16: Where Was I Recovery
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
+
+  // Feature 17: Decision Fatigue Helper
+  const [showDecisionHelper, setShowDecisionHelper] = useState(false);
+  const [decidedTask, setDecidedTask] = useState<Task | null>(null);
+
+  // Feature 18: Dopamine Menu
+  const [showDopamineMenu, setShowDopamineMenu] = useState(false);
+  const [dopamineActivities, setDopamineActivities] = useState<DopamineActivity[]>(DEFAULT_DOPAMINE_ACTIVITIES);
+
+  // Feature 19: Time Blindness Anchors
+  const [showTimeAnchor, setShowTimeAnchor] = useState(false);
+  const [lastTimeAnchor, setLastTimeAnchor] = useState<string | null>(null);
+
+  // Feature 20: Emotional Regulation
+  const [showEmotionalCheck, setShowEmotionalCheck] = useState(false);
+  const [currentEmotion, setCurrentEmotion] = useState<string | null>(null);
+  const [emotionIntensity, setEmotionIntensity] = useState(3);
+  const [emotionalHistory, setEmotionalHistory] = useState<EmotionalState[]>([]);
+
+  // Feature 21: Procrastination Buddy
+  const [showProcrastinationHelp, setShowProcrastinationHelp] = useState(false);
+  const [procrastinationTask, setProcrastinationTask] = useState<Task | null>(null);
+
+  // Feature 22: Impulse Delay Buffer
+  const [delayedImpulses, setDelayedImpulses] = useState<DelayedImpulse[]>([]);
+  const [showImpulseBuffer, setShowImpulseBuffer] = useState(false);
+  const [showAddImpulse, setShowAddImpulse] = useState(false);
+  const [readyImpulses, setReadyImpulses] = useState<DelayedImpulse[]>([]);
+
+  // Feature 23: Social Battery
+  const [socialInteractions, setSocialInteractions] = useState<SocialInteraction[]>([]);
+  const [socialBattery, setSocialBattery] = useState(10);
+  const [showSocialBattery, setShowSocialBattery] = useState(false);
+  const [showLogSocial, setShowLogSocial] = useState(false);
+
+  // Feature 24: Rumination Interrupt
+  const [showRuminationHelp, setShowRuminationHelp] = useState(false);
+
+  // Feature 25: Relationship Reminders
+  const [relationshipReminders, setRelationshipReminders] = useState<RelationshipReminder[]>([]);
+  const [showRelationships, setShowRelationships] = useState(false);
+  const [overdueContacts, setOverdueContacts] = useState<RelationshipReminder[]>([]);
+
+  // Feature 26: Flexible Routines
+  const [flexibleRoutines, setFlexibleRoutines] = useState<FlexibleRoutine[]>([]);
+  const [showRoutineCheck, setShowRoutineCheck] = useState(false);
+  const [currentRoutine, setCurrentRoutine] = useState<FlexibleRoutine | null>(null);
+
+  // Feature 27: Shame Spiral
+  const [showShameSupport, setShowShameSupport] = useState(false);
+
+  // Feature 28: Interest-Based Task Matching
+  const [interestBasedSuggestion, setInterestBasedSuggestion] = useState<Task | null>(null);
+
+  // Feature 29: Deadline Scaffolding
+  const [showDeadlineSetup, setShowDeadlineSetup] = useState(false);
+  const [deadlineTask, setDeadlineTask] = useState<Task | null>(null);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+
+  // Feature 30: Just Watch Me Accountability
+  const [accountabilityMode, setAccountabilityMode] = useState<string>('gentle');
+  const [showAccountabilitySetup, setShowAccountabilitySetup] = useState(false);
+
+  // Feature 31: Quiet Hours
+  const [quietHours, setQuietHours] = useState<QuietHours>({ enabled: false, startTime: '22:00', endTime: '08:00', days: [0,1,2,3,4,5,6], allowUrgent: true });
+  const [isInQuietHours, setIsInQuietHours] = useState(false);
+
+  // Feature 32: Win Journal
+  const [winEntries, setWinEntries] = useState<WinEntry[]>([]);
+  const [showWinJournal, setShowWinJournal] = useState(false);
+  const [showAddWin, setShowAddWin] = useState(false);
+  const [currentWinPrompt, setCurrentWinPrompt] = useState('');
+
+  // Feature 33: Sensory Overload Mode
+  const [sensoryOverloadMode, setSensoryOverloadMode] = useState(false);
+
+  // Feature 34: Task Swapping
+  const [showTaskSwap, setShowTaskSwap] = useState(false);
+  const [swapSuggestion, setSwapSuggestion] = useState<Task | null>(null);
+
+  // Feature 35: Commitment Device
+  const [commitments, setCommitments] = useState<Commitment[]>([]);
+  const [showCommitments, setShowCommitments] = useState(false);
+  const [showAddCommitment, setShowAddCommitment] = useState(false);
+  const [overdueCommitments, setOverdueCommitments] = useState<Commitment[]>([]);
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
   const fabAnim = useRef(new Animated.Value(1)).current;
@@ -1435,6 +2049,73 @@ export default function App() {
     setTodayFocusTime(totalTime);
   }, [completedTasks, focusSessions]);
 
+  // ============ FEATURES 16-35 EFFECTS ============
+
+  // Feature 16: Check for recovery mode on app load
+  useEffect(() => {
+    if (!isLoading && memory.facts.lastSeen) {
+      const shouldRecover = shouldShowRecovery(memory.facts.lastSeen);
+      if (shouldRecover && messages.length > 1) {
+        const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+        const context: SessionContext = {
+          lastActiveTask: bodyDoubleSession?.taskDescription,
+          lastTopic: lastUserMessage?.content.slice(0, 50),
+          lastActivity: memory.facts.lastSeen,
+          awayDuration: calculateAwayDuration(memory.facts.lastSeen),
+        };
+        setSessionContext(context);
+        setShowRecovery(true);
+      }
+    }
+  }, [isLoading]);
+
+  // Feature 19: Time blindness anchors during focus
+  useEffect(() => {
+    if (bodyDoubleMode && bodyDoubleSession) {
+      const anchorInterval = setInterval(() => {
+        const hoursSinceAnchor = lastTimeAnchor ? (Date.now() - new Date(lastTimeAnchor).getTime()) / 3600000 : 999;
+        if (hoursSinceAnchor >= 0.5) { // Every 30 minutes
+          setShowTimeAnchor(true);
+          setLastTimeAnchor(new Date().toISOString());
+        }
+      }, 60000);
+      return () => clearInterval(anchorInterval);
+    }
+  }, [bodyDoubleMode, bodyDoubleSession, lastTimeAnchor]);
+
+  // Feature 22: Check for ready impulses
+  useEffect(() => {
+    const now = new Date().toISOString();
+    const ready = delayedImpulses.filter(i => i.delayUntil <= now && i.status === 'waiting');
+    setReadyImpulses(ready);
+  }, [delayedImpulses]);
+
+  // Feature 23: Calculate social battery
+  useEffect(() => {
+    const battery = calculateSocialBattery(socialInteractions);
+    setSocialBattery(battery);
+  }, [socialInteractions]);
+
+  // Feature 25: Check overdue contacts
+  useEffect(() => {
+    const overdue = relationshipReminders.filter(needsContact);
+    setOverdueContacts(overdue);
+  }, [relationshipReminders]);
+
+  // Feature 31: Check quiet hours
+  useEffect(() => {
+    const checkQuiet = () => setIsInQuietHours(isQuietHours(quietHours));
+    checkQuiet();
+    const interval = setInterval(checkQuiet, 60000);
+    return () => clearInterval(interval);
+  }, [quietHours]);
+
+  // Feature 35: Check overdue commitments
+  useEffect(() => {
+    const overdue = getOverdueCommitments(commitments);
+    setOverdueCommitments(overdue);
+  }, [commitments]);
+
   const initializeApp = async () => {
     try {
       let storedDeviceId = await AsyncStorage.getItem('@nero/deviceId');
@@ -1464,6 +2145,10 @@ export default function App() {
             SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30), SupabaseService.getFocusSessions(30),
             SupabaseService.getTimeBlocks(), SupabaseService.getWaitingItems(), SupabaseService.getMedicationReminders(),
             SupabaseService.getRoutines(), SupabaseService.getEnergyContexts(14),
+            SupabaseService.getDelayedImpulses(), SupabaseService.getSocialInteractions(7),
+            SupabaseService.getRelationshipReminders(), SupabaseService.getWinEntries(30),
+            SupabaseService.getCommitments(), SupabaseService.getFlexibleRoutines(),
+            SupabaseService.getEmotionalHistory(14),
           ]);
           if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
           if (cloudMessages.length > 0) setMessages(cloudMessages);
@@ -1712,6 +2397,20 @@ export default function App() {
     if (detectRSD(text) && !showRSDSupport) {
       setRsdTriggerMessage(text);
       setShowRSDSupport(true);
+      setIsThinking(false);
+      return;
+    }
+
+    // Feature 24: Rumination Detection
+    if (detectRumination(text, messages) && !showRuminationHelp) {
+      setShowRuminationHelp(true);
+      setIsThinking(false);
+      return;
+    }
+
+    // Feature 27: Shame Spiral Detection
+    if (detectShameSpiral(text) && !showShameSupport) {
+      setShowShameSupport(true);
       setIsThinking(false);
       return;
     }
@@ -2009,6 +2708,353 @@ export default function App() {
     }
   }, [crisisMode]);
 
+  // ============ FEATURES 16-35 HANDLERS ============
+
+  // Feature 16: Where Was I Recovery
+  const handleRecoveryDismiss = () => {
+    setShowRecovery(false);
+    setSessionContext(null);
+  };
+
+  const handleRecoveryResume = async () => {
+    setShowRecovery(false);
+    if (sessionContext?.lastActiveTask) {
+      const task = openTasks.find(t => t.description === sessionContext.lastActiveTask);
+      if (task) startBodyDoubleMode(task);
+    }
+    setSessionContext(null);
+  };
+
+  // Feature 17: Decision Fatigue Helper
+  const handleDecisionHelp = () => {
+    const picked = pickRandomTask(openTasks);
+    setDecidedTask(picked);
+    setShowDecisionHelper(true);
+  };
+
+  const handleDecisionAccept = () => {
+    setShowDecisionHelper(false);
+    if (decidedTask) startBodyDoubleMode(decidedTask);
+    setDecidedTask(null);
+  };
+
+  // Feature 18: Dopamine Menu
+  const handleDopamineSelect = async (activity: DopamineActivity) => {
+    setShowDopamineMenu(false);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: `Go ${activity.name.toLowerCase()}! Take ${activity.duration} minutes. I'll be here.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 19: Time Anchor
+  const handleTimeAnchorDismiss = () => {
+    setShowTimeAnchor(false);
+  };
+
+  // Feature 20: Emotional Regulation
+  const handleEmotionalSubmit = async () => {
+    if (!currentEmotion) return;
+    const state: EmotionalState = {
+      emotion: currentEmotion,
+      intensity: emotionIntensity,
+      timestamp: new Date().toISOString(),
+    };
+    setEmotionalHistory(prev => [state, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.logEmotionalState(state);
+
+    const strategies = COPING_STRATEGIES[currentEmotion as keyof typeof COPING_STRATEGIES] || [];
+    const suggestion = strategies[Math.floor(Math.random() * strategies.length)];
+
+    setShowEmotionalCheck(false);
+    setCurrentEmotion(null);
+
+    if (suggestion) {
+      const neroMessage: Message = {
+        id: generateId(), role: 'nero',
+        content: `Feeling ${currentEmotion}. That's valid. Maybe try: ${suggestion}`,
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    }
+  };
+
+  // Feature 21: Procrastination Buddy
+  const handleProcrastinationHelp = (task: Task) => {
+    setProcrastinationTask(task);
+    setShowProcrastinationHelp(true);
+  };
+
+  const handleProcrastinationBlocker = async (blocker: typeof PROCRASTINATION_BLOCKERS[0]) => {
+    setShowProcrastinationHelp(false);
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: blocker.suggestion,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+    setProcrastinationTask(null);
+  };
+
+  // Feature 22: Impulse Delay Buffer
+  const addDelayedImpulse = async (description: string, category: 'purchase' | 'decision' | 'action', cost?: number) => {
+    const impulse: DelayedImpulse = {
+      id: generateId(),
+      description,
+      category,
+      createdAt: new Date().toISOString(),
+      delayUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+      status: 'waiting',
+      estimatedCost: cost,
+    };
+    setDelayedImpulses(prev => [...prev, impulse]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveDelayedImpulse(impulse);
+    setShowAddImpulse(false);
+  };
+
+  const handleImpulseDecision = async (impulseId: string, approved: boolean) => {
+    const status = approved ? 'approved' : 'dismissed';
+    setDelayedImpulses(prev => prev.filter(i => i.id !== impulseId));
+    setReadyImpulses(prev => prev.filter(i => i.id !== impulseId));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.updateImpulseStatus(impulseId, status);
+
+    const message = approved
+      ? "You still want it after 24 hours. Go for it!"
+      : "Good call. You didn't need it after all.";
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content: message, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 23: Social Battery
+  const logSocialInteraction = async (type: SocialInteraction['type'], duration: number, energyCost: number) => {
+    const interaction: SocialInteraction = {
+      id: generateId(),
+      type,
+      duration,
+      energyCost,
+      timestamp: new Date().toISOString(),
+    };
+    setSocialInteractions(prev => [interaction, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.logSocialInteraction(interaction);
+    setShowLogSocial(false);
+  };
+
+  // Feature 24: Rumination Interrupt
+  const handleRuminationHelp = async (action: 'journal' | 'reframe' | 'distract') => {
+    setShowRuminationHelp(false);
+    let content = '';
+
+    if (action === 'journal') {
+      content = "Let's write it all out. Get every thought out of your head and onto the screen. I'm listening.";
+    } else if (action === 'reframe') {
+      content = "Let's challenge that thought. What evidence supports it? What evidence contradicts it?";
+    } else {
+      content = "Sometimes the best thing is a pattern interrupt. Want to try a quick dopamine activity?";
+      setShowDopamineMenu(true);
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 25: Relationship Reminders
+  const markContactMade = async (reminderId: string) => {
+    setRelationshipReminders(prev => prev.map(r => r.id === reminderId ? { ...r, lastContact: new Date().toISOString() } : r));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.markContactMade(reminderId);
+  };
+
+  // Feature 26: Flexible Routines
+  const handleRoutineItemToggle = (routineId: string, itemId: string) => {
+    setFlexibleRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+      const items = r.items.map(i => i.id === itemId ? { ...i, completed: !i.completed } : i);
+      return { ...r, items };
+    }));
+  };
+
+  const handleRoutineComplete = async () => {
+    if (!currentRoutine) return;
+    const completedCount = currentRoutine.items.filter(i => i.completed).length;
+    const isSuccess = completedCount >= currentRoutine.minItemsForSuccess;
+
+    const updatedRoutine = {
+      ...currentRoutine,
+      streak: isSuccess ? currentRoutine.streak + 1 : 0,
+      lastCompleted: new Date().toISOString(),
+      items: currentRoutine.items.map(i => ({ ...i, completed: false })),
+    };
+
+    setFlexibleRoutines(prev => prev.map(r => r.id === currentRoutine.id ? updatedRoutine : r));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveFlexibleRoutine(updatedRoutine);
+
+    setShowRoutineCheck(false);
+    setCurrentRoutine(null);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: isSuccess
+        ? `${completedCount} items done. That counts! ${updatedRoutine.streak} day streak.`
+        : `${completedCount} items. Some days are like that. Tomorrow is fresh.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 27: Shame Spiral Support
+  const handleShameSupport = async (action: 'reframe' | 'compassion' | 'dismiss') => {
+    setShowShameSupport(false);
+    let content = '';
+
+    if (action === 'reframe') {
+      content = "Let's look at this differently. What would you tell a friend who said this about themselves?";
+    } else if (action === 'compassion') {
+      content = "You're being really hard on yourself. ADHD brains struggle with things that seem 'easy' to others. That's not a character flaw.";
+    } else {
+      content = "Okay. I'm here if you want to talk.";
+    }
+
+    const neroMessage: Message = { id: generateId(), role: 'nero', content, timestamp: new Date().toISOString() };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 28: Interest-Based Suggestion
+  const getInterestBasedSuggestion = () => {
+    const suggestion = findInterestBasedTask(openTasks, completedTasks);
+    setInterestBasedSuggestion(suggestion);
+  };
+
+  // Feature 29: Deadline Scaffolding
+  const setupDeadline = async (task: Task, deadline: string) => {
+    const newMilestones = generateMilestones(task, deadline);
+    setMilestones(newMilestones);
+
+    for (const milestone of newMilestones) {
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMilestone(milestone);
+    }
+
+    setShowDeadlineSetup(false);
+    setDeadlineTask(null);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: `Got it. I've broken this into ${newMilestones.length} milestones. First up: "${newMilestones[0]?.description}" by ${new Date(newMilestones[0]?.dueDate).toLocaleDateString()}.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 32: Win Journal
+  const addWinEntry = async (content: string, category?: WinEntry['category']) => {
+    const entry: WinEntry = {
+      id: generateId(),
+      content,
+      timestamp: new Date().toISOString(),
+      category,
+    };
+    setWinEntries(prev => [entry, ...prev]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveWinEntry(entry);
+    setShowAddWin(false);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: "That's a win. Captured it. These add up.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  // Feature 33: Sensory Overload Mode
+  const toggleSensoryOverload = () => {
+    setSensoryOverloadMode(prev => !prev);
+    if (!sensoryOverloadMode) {
+      // Entering overload mode
+      const neroMessage: Message = {
+        id: generateId(), role: 'nero',
+        content: "Simplified mode on. Less noise. Just breathe.",
+        timestamp: new Date().toISOString(),
+      };
+      const newMessages = [...messages, neroMessage];
+      setMessages(newMessages);
+    }
+  };
+
+  // Feature 34: Task Swapping
+  const handleTaskSwap = () => {
+    const current = bodyDoubleSession?.taskId ? openTasks.find(t => t.id === bodyDoubleSession.taskId) : null;
+    const swap = findSwapTask(current || null, openTasks);
+    setSwapSuggestion(swap);
+    setShowTaskSwap(true);
+  };
+
+  const acceptTaskSwap = async () => {
+    setShowTaskSwap(false);
+    if (swapSuggestion) {
+      if (bodyDoubleMode) await endBodyDoubleMode(false);
+      startBodyDoubleMode(swapSuggestion);
+    }
+    setSwapSuggestion(null);
+  };
+
+  // Feature 35: Commitment Device
+  const addCommitment = async (description: string, deadline: string, witness?: string) => {
+    const commitment: Commitment = {
+      id: generateId(),
+      description,
+      deadline,
+      witness,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+    setCommitments(prev => [...prev, commitment]);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveCommitment(commitment);
+    setShowAddCommitment(false);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: `Commitment logged: "${description}" by ${new Date(deadline).toLocaleDateString()}.${witness ? ` ${witness} is your witness.` : ''} You got this.`,
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
+  const resolveCommitment = async (commitmentId: string, kept: boolean) => {
+    const status = kept ? 'kept' : 'broken';
+    setCommitments(prev => prev.filter(c => c.id !== commitmentId));
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.updateCommitmentStatus(commitmentId, status);
+
+    const neroMessage: Message = {
+      id: generateId(), role: 'nero',
+      content: kept ? "You kept your commitment. That matters." : "It didn't happen this time. What got in the way? No judgment.",
+      timestamp: new Date().toISOString(),
+    };
+    const newMessages = [...messages, neroMessage];
+    setMessages(newMessages);
+    if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
+  };
+
   const clearHistory = async () => {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.clearMessages();
     const confirm: Message = { id: generateId(), role: 'nero', content: "Fresh start. I still remember you.", timestamp: new Date().toISOString() };
@@ -2185,6 +3231,364 @@ export default function App() {
             <TouchableOpacity style={styles.statsButton} onPress={() => setShowFocusStats(false)}>
               <Text style={styles.statsButtonText}>Got it</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ============ FEATURES 16-35 UI COMPONENTS ============
+
+  // Feature 16: Where Was I Recovery
+  if (showRecovery && sessionContext) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.recoveryContainer}>
+          <View style={styles.recoveryCard}>
+            <Text style={styles.recoveryTitle}>Welcome back!</Text>
+            <Text style={styles.recoveryMessage}>
+              You were away for {Math.round(sessionContext.awayDuration)} minutes.
+              {sessionContext.lastActiveTask && `\n\nYou were working on: "${sessionContext.lastActiveTask}"`}
+              {sessionContext.lastTopic && !sessionContext.lastActiveTask && `\n\nLast topic: "${sessionContext.lastTopic}..."`}
+            </Text>
+            <View style={styles.recoveryActions}>
+              <TouchableOpacity style={styles.recoveryButton} onPress={handleRecoveryDismiss}>
+                <Text style={styles.recoveryButtonText}>Start fresh</Text>
+              </TouchableOpacity>
+              {sessionContext.lastActiveTask && (
+                <TouchableOpacity style={[styles.recoveryButton, styles.recoveryButtonPrimary]} onPress={handleRecoveryResume}>
+                  <Text style={styles.recoveryButtonTextPrimary}>Resume task</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 17: Decision Fatigue Helper
+  if (showDecisionHelper) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.decisionContainer}>
+          <View style={styles.decisionCard}>
+            <Text style={styles.decisionTitle}>I'll decide for you</Text>
+            <Text style={styles.decisionMessage}>{DECISION_PROMPTS[Math.floor(Math.random() * DECISION_PROMPTS.length)]}</Text>
+            {decidedTask && (
+              <View style={styles.decisionTaskCard}>
+                <Text style={styles.decisionTaskText}>{decidedTask.description}</Text>
+              </View>
+            )}
+            <View style={styles.decisionActions}>
+              <TouchableOpacity style={styles.decisionButton} onPress={() => { setDecidedTask(pickRandomTask(openTasks)); }}>
+                <Text style={styles.decisionButtonText}>Pick another</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.decisionButton, styles.decisionButtonPrimary]} onPress={handleDecisionAccept}>
+                <Text style={styles.decisionButtonTextPrimary}>Do this one</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.decisionDismiss} onPress={() => setShowDecisionHelper(false)}>
+              <Text style={styles.decisionDismissText}>Never mind</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 18: Dopamine Menu
+  if (showDopamineMenu) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.dopamineContainer}>
+          <View style={styles.dopamineCard}>
+            <Text style={styles.dopamineTitle}>Dopamine Menu</Text>
+            <Text style={styles.dopamineSubtitle}>Pick a quick reward</Text>
+            <ScrollView style={styles.dopamineList}>
+              {dopamineActivities.map(activity => (
+                <TouchableOpacity key={activity.id} style={styles.dopamineItem} onPress={() => handleDopamineSelect(activity)}>
+                  <Text style={styles.dopamineItemName}>{activity.name}</Text>
+                  <Text style={styles.dopamineItemDuration}>{activity.duration}m</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.dopamineDismiss} onPress={() => setShowDopamineMenu(false)}>
+              <Text style={styles.dopamineDismissText}>Not now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 19: Time Blindness Anchor
+  if (showTimeAnchor && bodyDoubleMode && bodyDoubleSession) {
+    const timeString = formatTimeAnchor(bodyDoubleSession.startedAt);
+    return (
+      <SafeAreaView style={[styles.container, styles.bodyDoubleContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.timeAnchorCard}>
+          <Text style={styles.timeAnchorTitle}>Time Check</Text>
+          <Text style={styles.timeAnchorMessage}>{TIME_ANCHOR_MESSAGES[Math.floor(Math.random() * TIME_ANCHOR_MESSAGES.length)].replace('{duration}', timeString)}</Text>
+          <TouchableOpacity style={styles.timeAnchorButton} onPress={handleTimeAnchorDismiss}>
+            <Text style={styles.timeAnchorButtonText}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 20: Emotional Regulation Check
+  if (showEmotionalCheck) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.emotionalContainer}>
+          <View style={styles.emotionalCard}>
+            <Text style={styles.emotionalTitle}>Emotional check-in</Text>
+            <Text style={styles.emotionalSubtitle}>How are you feeling right now?</Text>
+            <View style={styles.emotionalGrid}>
+              {EMOTION_OPTIONS.map(emotion => (
+                <TouchableOpacity key={emotion} style={[styles.emotionalOption, currentEmotion === emotion && styles.emotionalOptionSelected]} onPress={() => setCurrentEmotion(emotion)}>
+                  <Text style={[styles.emotionalOptionText, currentEmotion === emotion && styles.emotionalOptionTextSelected]}>{emotion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {currentEmotion && (
+              <View style={styles.intensitySlider}>
+                <Text style={styles.intensityLabel}>Intensity: {emotionIntensity}/5</Text>
+                <View style={styles.intensityButtons}>
+                  {[1,2,3,4,5].map(n => (
+                    <TouchableOpacity key={n} style={[styles.intensityButton, emotionIntensity === n && styles.intensityButtonSelected]} onPress={() => setEmotionIntensity(n)}>
+                      <Text style={styles.intensityButtonText}>{n}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            <View style={styles.emotionalActions}>
+              <TouchableOpacity style={styles.emotionalSkip} onPress={() => setShowEmotionalCheck(false)}>
+                <Text style={styles.emotionalSkipText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.emotionalSubmit, !currentEmotion && styles.emotionalSubmitDisabled]} onPress={handleEmotionalSubmit} disabled={!currentEmotion}>
+                <Text style={styles.emotionalSubmitText}>Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 21: Procrastination Buddy
+  if (showProcrastinationHelp && procrastinationTask) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.procrastinationContainer}>
+          <View style={styles.procrastinationCard}>
+            <Text style={styles.procrastinationTitle}>What's blocking you?</Text>
+            <Text style={styles.procrastinationTask}>Task: "{procrastinationTask.description}"</Text>
+            <ScrollView style={styles.procrastinationOptions}>
+              {PROCRASTINATION_BLOCKERS.map((blocker, i) => (
+                <TouchableOpacity key={i} style={styles.procrastinationOption} onPress={() => handleProcrastinationBlocker(blocker)}>
+                  <Text style={styles.procrastinationOptionText}>{blocker.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.procrastinationDismiss} onPress={() => setShowProcrastinationHelp(false)}>
+              <Text style={styles.procrastinationDismissText}>Something else</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 22: Ready Impulses Review
+  if (readyImpulses.length > 0 && !showImpulseBuffer) {
+    const impulse = readyImpulses[0];
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.impulseContainer}>
+          <View style={styles.impulseCard}>
+            <Text style={styles.impulseTitle}>24 hours later...</Text>
+            <Text style={styles.impulseMessage}>You wanted to: "{impulse.description}"</Text>
+            {impulse.estimatedCost && <Text style={styles.impulseCost}>${impulse.estimatedCost}</Text>}
+            <Text style={styles.impulseQuestion}>Do you still want this?</Text>
+            <View style={styles.impulseActions}>
+              <TouchableOpacity style={styles.impulseButton} onPress={() => handleImpulseDecision(impulse.id, false)}>
+                <Text style={styles.impulseButtonText}>Nah, I'm good</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.impulseButton, styles.impulseButtonPrimary]} onPress={() => handleImpulseDecision(impulse.id, true)}>
+                <Text style={styles.impulseButtonTextPrimary}>Still want it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 23: Social Battery Warning
+  if (socialBattery <= 2 && !showSocialBattery && socialInteractions.length > 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.socialContainer}>
+          <View style={styles.socialCard}>
+            <Text style={styles.socialTitle}>Social Battery Low</Text>
+            <View style={styles.batteryIndicator}>
+              <View style={[styles.batteryLevel, { width: `${socialBattery * 10}%` }]} />
+            </View>
+            <Text style={styles.socialMessage}>You've had a lot of social interaction today. Consider some alone time.</Text>
+            <TouchableOpacity style={styles.socialButton} onPress={() => setShowSocialBattery(true)}>
+              <Text style={styles.socialButtonText}>Thanks for the heads up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 24: Rumination Help
+  if (showRuminationHelp) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.ruminationContainer}>
+          <View style={styles.ruminationCard}>
+            <Text style={styles.ruminationTitle}>Thought loop detected</Text>
+            <Text style={styles.ruminationMessage}>You've been circling around similar thoughts. That's exhausting. Want to try something?</Text>
+            <View style={styles.ruminationActions}>
+              <TouchableOpacity style={styles.ruminationButton} onPress={() => handleRuminationHelp('journal')}>
+                <Text style={styles.ruminationButtonText}>Write it out</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.ruminationButton} onPress={() => handleRuminationHelp('reframe')}>
+                <Text style={styles.ruminationButtonText}>Challenge it</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.ruminationButton} onPress={() => handleRuminationHelp('distract')}>
+                <Text style={styles.ruminationButtonText}>Break the loop</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.ruminationDismiss} onPress={() => setShowRuminationHelp(false)}>
+              <Text style={styles.ruminationDismissText}>I'm okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 27: Shame Spiral Support
+  if (showShameSupport) {
+    const shameMessage = SHAME_RESPONSES[Math.floor(Math.random() * SHAME_RESPONSES.length)];
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.shameContainer}>
+          <View style={styles.shameCard}>
+            <Text style={styles.shameTitle}>Hey, pause for a sec</Text>
+            <Text style={styles.shameMessage}>{shameMessage}</Text>
+            <View style={styles.shameActions}>
+              <TouchableOpacity style={styles.shameButton} onPress={() => handleShameSupport('reframe')}>
+                <Text style={styles.shameButtonText}>Help me reframe</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.shameButton} onPress={() => handleShameSupport('compassion')}>
+                <Text style={styles.shameButtonText}>I need compassion</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.shameDismiss} onPress={() => handleShameSupport('dismiss')}>
+              <Text style={styles.shameDismissText}>I'm okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 32: Win Journal
+  if (showWinJournal) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.winJournalContainer}>
+          <View style={styles.winJournalCard}>
+            <View style={styles.winJournalHeader}>
+              <Text style={styles.winJournalTitle}>Win Journal</Text>
+              <TouchableOpacity onPress={() => setShowWinJournal(false)}><Text style={styles.winJournalClose}>✕</Text></TouchableOpacity>
+            </View>
+            {winEntries.length === 0 ? (
+              <Text style={styles.winJournalEmpty}>No wins recorded yet. Start capturing the good stuff!</Text>
+            ) : (
+              <ScrollView style={styles.winJournalList}>
+                {winEntries.slice(0, 10).map(entry => (
+                  <View key={entry.id} style={styles.winEntry}>
+                    <Text style={styles.winEntryText}>{entry.content}</Text>
+                    <Text style={styles.winEntryDate}>{getRelativeTime(entry.timestamp)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={styles.winJournalAdd} onPress={() => { setCurrentWinPrompt(WIN_JOURNAL_PROMPTS[Math.floor(Math.random() * WIN_JOURNAL_PROMPTS.length)]); setShowAddWin(true); }}>
+              <Text style={styles.winJournalAddText}>+ Add a win</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 34: Task Swap
+  if (showTaskSwap && swapSuggestion) {
+    return (
+      <SafeAreaView style={[styles.container, bodyDoubleMode && styles.bodyDoubleContainer]}>
+        <StatusBar style="light" />
+        <View style={styles.swapContainer}>
+          <View style={styles.swapCard}>
+            <Text style={styles.swapTitle}>Stuck? Try switching</Text>
+            <Text style={styles.swapMessage}>{TASK_SWAP_MESSAGES[Math.floor(Math.random() * TASK_SWAP_MESSAGES.length)]}</Text>
+            <View style={styles.swapTaskCard}>
+              <Text style={styles.swapTaskText}>{swapSuggestion.description}</Text>
+            </View>
+            <View style={styles.swapActions}>
+              <TouchableOpacity style={styles.swapButton} onPress={() => setShowTaskSwap(false)}>
+                <Text style={styles.swapButtonText}>Stay on current</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.swapButton, styles.swapButtonPrimary]} onPress={acceptTaskSwap}>
+                <Text style={styles.swapButtonTextPrimary}>Switch to this</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Feature 35: Overdue Commitments
+  if (overdueCommitments.length > 0 && !showCommitments) {
+    const commitment = overdueCommitments[0];
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.commitmentContainer}>
+          <View style={styles.commitmentCard}>
+            <Text style={styles.commitmentTitle}>Commitment check</Text>
+            <Text style={styles.commitmentMessage}>"{commitment.description}"</Text>
+            <Text style={styles.commitmentDeadline}>Was due: {new Date(commitment.deadline).toLocaleDateString()}</Text>
+            <View style={styles.commitmentActions}>
+              <TouchableOpacity style={styles.commitmentButton} onPress={() => resolveCommitment(commitment.id, false)}>
+                <Text style={styles.commitmentButtonText}>Didn't happen</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.commitmentButton, styles.commitmentButtonPrimary]} onPress={() => resolveCommitment(commitment.id, true)}>
+                <Text style={styles.commitmentButtonTextPrimary}>I did it!</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </SafeAreaView>
@@ -2677,6 +4081,102 @@ export default function App() {
             <View style={styles.settingsSection}>
               <TouchableOpacity style={styles.sensoryPreview} onPress={() => { setShowSettings(false); setShowSensoryCheck(true); }}>
                 <Text style={styles.sensoryPreviewText}>🌿 Environment Check</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 17: Decision Helper */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); handleDecisionHelp(); }}>
+                <Text style={styles.featureButtonText}>🎲 Decide for me</Text>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>Too many choices? Let Nero pick.</Text>
+            </View>
+
+            {/* Feature 18: Dopamine Menu */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowDopamineMenu(true); }}>
+                <Text style={styles.featureButtonText}>🍭 Dopamine Menu</Text>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>Quick healthy rewards</Text>
+            </View>
+
+            {/* Feature 20: Emotional Check-in */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowEmotionalCheck(true); }}>
+                <Text style={styles.featureButtonText}>💭 Emotional Check-in</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 22: Impulse Buffer */}
+            {delayedImpulses.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>Impulse Buffer ({delayedImpulses.length})</Text>
+                <TouchableOpacity style={styles.featurePreview} onPress={() => { setShowSettings(false); setShowImpulseBuffer(true); }}>
+                  <Text style={styles.featurePreviewText}>{delayedImpulses[0].description}</Text>
+                  {delayedImpulses.length > 1 && <Text style={styles.featurePreviewMore}>+{delayedImpulses.length - 1} more waiting</Text>}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Feature 23: Social Battery */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Social Battery</Text>
+              <View style={styles.batteryRow}>
+                <View style={styles.batteryIndicatorSmall}>
+                  <View style={[styles.batteryLevelSmall, { width: `${socialBattery * 10}%`, backgroundColor: socialBattery > 5 ? COLORS.accent : socialBattery > 2 ? COLORS.warning : COLORS.delete }]} />
+                </View>
+                <Text style={styles.batteryText}>{socialBattery}/10</Text>
+                <TouchableOpacity onPress={() => { setShowSettings(false); setShowLogSocial(true); }}>
+                  <Text style={styles.updateLink}>Log interaction</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Feature 25: Relationship Reminders */}
+            {overdueContacts.length > 0 && (
+              <View style={styles.settingsSection}>
+                <Text style={styles.settingsLabel}>People to reach out to</Text>
+                {overdueContacts.slice(0, 3).map(r => (
+                  <View key={r.id} style={styles.relationshipRow}>
+                    <Text style={styles.relationshipName}>{r.personName}</Text>
+                    <TouchableOpacity onPress={() => markContactMade(r.id)}>
+                      <Text style={styles.relationshipAction}>Mark contacted</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Feature 32: Win Journal */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowWinJournal(true); }}>
+                <Text style={styles.featureButtonText}>🏆 Win Journal ({winEntries.length})</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Feature 33: Sensory Overload Mode */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.toggleRow} onPress={toggleSensoryOverload}>
+                <Text style={styles.toggleLabel}>Sensory Overload Mode</Text>
+                <View style={[styles.toggle, sensoryOverloadMode && styles.toggleOn]}><View style={[styles.toggleThumb, sensoryOverloadMode && styles.toggleThumbOn]} /></View>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>Simplified, calmer UI</Text>
+            </View>
+
+            {/* Feature 31: Quiet Hours */}
+            <View style={styles.settingsSection}>
+              <TouchableOpacity style={styles.toggleRow} onPress={() => setQuietHours(prev => ({ ...prev, enabled: !prev.enabled }))}>
+                <Text style={styles.toggleLabel}>Quiet Hours ({quietHours.startTime} - {quietHours.endTime})</Text>
+                <View style={[styles.toggle, quietHours.enabled && styles.toggleOn]}><View style={[styles.toggleThumb, quietHours.enabled && styles.toggleThumbOn]} /></View>
+              </TouchableOpacity>
+              <Text style={styles.settingsHint}>No check-ins during these hours</Text>
+            </View>
+
+            {/* Feature 35: Commitments */}
+            <View style={styles.settingsSection}>
+              <Text style={styles.settingsLabel}>Commitments ({commitments.length})</Text>
+              <TouchableOpacity style={styles.featureButton} onPress={() => { setShowSettings(false); setShowAddCommitment(true); }}>
+                <Text style={styles.featureButtonText}>+ Make a commitment</Text>
               </TouchableOpacity>
             </View>
 
@@ -3177,4 +4677,185 @@ const styles = StyleSheet.create({
   // Feature 11: External Motivation (uses existing toggle styles)
   motivationBanner: { backgroundColor: COLORS.motivation + '20', padding: 14, borderBottomWidth: 1, borderBottomColor: COLORS.motivation + '40' },
   motivationBannerText: { color: COLORS.motivation, fontSize: 14, textAlign: 'center' },
+
+  // ============ FEATURES 16-35 STYLES ============
+
+  // Feature 16: Recovery
+  recoveryContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  recoveryCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  recoveryTitle: { color: COLORS.recovery, fontSize: 22, fontWeight: '600', marginBottom: 12 },
+  recoveryMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 24 },
+  recoveryActions: { flexDirection: 'row', gap: 12 },
+  recoveryButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  recoveryButtonPrimary: { backgroundColor: COLORS.recovery },
+  recoveryButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  recoveryButtonTextPrimary: { color: COLORS.bg, fontSize: 15, fontWeight: '600' },
+
+  // Feature 17: Decision
+  decisionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  decisionCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  decisionTitle: { color: COLORS.decision, fontSize: 22, fontWeight: '600', marginBottom: 12 },
+  decisionMessage: { color: COLORS.textMuted, fontSize: 15, marginBottom: 20 },
+  decisionTaskCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 18, marginBottom: 24, borderLeftWidth: 3, borderLeftColor: COLORS.decision },
+  decisionTaskText: { color: COLORS.text, fontSize: 18, fontWeight: '500' },
+  decisionActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  decisionButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  decisionButtonPrimary: { backgroundColor: COLORS.decision },
+  decisionButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  decisionButtonTextPrimary: { color: COLORS.bg, fontSize: 15, fontWeight: '600' },
+  decisionDismiss: { padding: 12, alignItems: 'center' },
+  decisionDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 18: Dopamine Menu
+  dopamineContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dopamineCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, maxHeight: '80%' },
+  dopamineTitle: { color: COLORS.dopamine, fontSize: 22, fontWeight: '600', marginBottom: 4 },
+  dopamineSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  dopamineList: { maxHeight: 300 },
+  dopamineItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 10 },
+  dopamineItemName: { color: COLORS.text, fontSize: 15, flex: 1 },
+  dopamineItemDuration: { color: COLORS.dopamine, fontSize: 13, fontWeight: '600' },
+  dopamineDismiss: { padding: 12, alignItems: 'center', marginTop: 8 },
+  dopamineDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 19: Time Anchor
+  timeAnchorCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '90%', maxWidth: 380 },
+  timeAnchorTitle: { color: COLORS.timeBlinds, fontSize: 16, fontWeight: '600', marginBottom: 12 },
+  timeAnchorMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 24 },
+  timeAnchorButton: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  timeAnchorButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+
+  // Feature 20: Emotional Check
+  emotionalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emotionalCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 420 },
+  emotionalTitle: { color: COLORS.emotional, fontSize: 22, fontWeight: '600', marginBottom: 4 },
+  emotionalSubtitle: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  emotionalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  emotionalOption: { backgroundColor: COLORS.surfaceLight, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border },
+  emotionalOptionSelected: { backgroundColor: COLORS.emotional + '30', borderColor: COLORS.emotional },
+  emotionalOptionText: { color: COLORS.textMuted, fontSize: 14 },
+  emotionalOptionTextSelected: { color: COLORS.emotional },
+  intensitySlider: { marginBottom: 20 },
+  intensityLabel: { color: COLORS.textMuted, fontSize: 13, marginBottom: 10 },
+  intensityButtons: { flexDirection: 'row', gap: 8 },
+  intensityButton: { flex: 1, padding: 12, borderRadius: 8, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  intensityButtonSelected: { backgroundColor: COLORS.emotional },
+  intensityButtonText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+  emotionalActions: { flexDirection: 'row', gap: 12 },
+  emotionalSkip: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  emotionalSkipText: { color: COLORS.textMuted, fontSize: 16 },
+  emotionalSubmit: { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.emotional, alignItems: 'center' },
+  emotionalSubmitDisabled: { opacity: 0.5 },
+  emotionalSubmitText: { color: COLORS.text, fontSize: 16, fontWeight: '600' },
+
+  // Feature 21: Procrastination
+  procrastinationContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  procrastinationCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400 },
+  procrastinationTitle: { color: COLORS.text, fontSize: 22, fontWeight: '600', marginBottom: 8 },
+  procrastinationTask: { color: COLORS.textMuted, fontSize: 14, marginBottom: 20 },
+  procrastinationOptions: { maxHeight: 280 },
+  procrastinationOption: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 16, marginBottom: 10 },
+  procrastinationOptionText: { color: COLORS.text, fontSize: 15 },
+  procrastinationDismiss: { padding: 12, alignItems: 'center', marginTop: 8 },
+  procrastinationDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 22: Impulse Buffer
+  impulseContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  impulseCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  impulseTitle: { color: COLORS.impulse, fontSize: 18, fontWeight: '600', marginBottom: 16 },
+  impulseMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 8 },
+  impulseCost: { color: COLORS.impulse, fontSize: 24, fontWeight: '700', marginBottom: 16 },
+  impulseQuestion: { color: COLORS.textMuted, fontSize: 15, marginBottom: 24 },
+  impulseActions: { flexDirection: 'row', gap: 12 },
+  impulseButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  impulseButtonPrimary: { backgroundColor: COLORS.impulse },
+  impulseButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  impulseButtonTextPrimary: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+
+  // Feature 23: Social Battery
+  socialContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  socialCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 380 },
+  socialTitle: { color: COLORS.social, fontSize: 20, fontWeight: '600', marginBottom: 16 },
+  batteryIndicator: { height: 20, backgroundColor: COLORS.surfaceLight, borderRadius: 10, marginBottom: 16, overflow: 'hidden' },
+  batteryLevel: { height: '100%', backgroundColor: COLORS.delete, borderRadius: 10 },
+  socialMessage: { color: COLORS.text, fontSize: 15, lineHeight: 22, marginBottom: 24 },
+  socialButton: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  socialButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  batteryRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  batteryIndicatorSmall: { flex: 1, height: 12, backgroundColor: COLORS.surfaceLight, borderRadius: 6, overflow: 'hidden' },
+  batteryLevelSmall: { height: '100%', borderRadius: 6 },
+  batteryText: { color: COLORS.text, fontSize: 14, fontWeight: '600' },
+
+  // Feature 24: Rumination
+  ruminationContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  ruminationCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  ruminationTitle: { color: COLORS.rumination, fontSize: 20, fontWeight: '600', marginBottom: 12 },
+  ruminationMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 24 },
+  ruminationActions: { gap: 10, marginBottom: 16 },
+  ruminationButton: { padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  ruminationButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  ruminationDismiss: { padding: 12, alignItems: 'center' },
+  ruminationDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 25: Relationships
+  relationshipRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  relationshipName: { color: COLORS.text, fontSize: 15 },
+  relationshipAction: { color: COLORS.relationship, fontSize: 14 },
+
+  // Feature 27: Shame
+  shameContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  shameCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  shameTitle: { color: COLORS.shame, fontSize: 20, fontWeight: '600', marginBottom: 12 },
+  shameMessage: { color: COLORS.text, fontSize: 16, lineHeight: 24, marginBottom: 24 },
+  shameActions: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  shameButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  shameButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  shameDismiss: { padding: 12, alignItems: 'center' },
+  shameDismissText: { color: COLORS.textDim, fontSize: 14 },
+
+  // Feature 32: Win Journal
+  winJournalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  winJournalCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 24, width: '100%', maxWidth: 400, maxHeight: '80%' },
+  winJournalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  winJournalTitle: { color: COLORS.wins, fontSize: 22, fontWeight: '600' },
+  winJournalClose: { color: COLORS.textMuted, fontSize: 24, padding: 4 },
+  winJournalEmpty: { color: COLORS.textMuted, fontSize: 15, textAlign: 'center', paddingVertical: 32 },
+  winJournalList: { maxHeight: 300 },
+  winEntry: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 14, marginBottom: 10 },
+  winEntryText: { color: COLORS.text, fontSize: 15, marginBottom: 4 },
+  winEntryDate: { color: COLORS.textDim, fontSize: 12 },
+  winJournalAdd: { backgroundColor: COLORS.wins + '20', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 12 },
+  winJournalAddText: { color: COLORS.wins, fontSize: 15, fontWeight: '600' },
+
+  // Feature 34: Task Swap
+  swapContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  swapCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  swapTitle: { color: COLORS.swap, fontSize: 20, fontWeight: '600', marginBottom: 8 },
+  swapMessage: { color: COLORS.textMuted, fontSize: 15, marginBottom: 20 },
+  swapTaskCard: { backgroundColor: COLORS.surfaceLight, borderRadius: 12, padding: 18, marginBottom: 24, borderLeftWidth: 3, borderLeftColor: COLORS.swap },
+  swapTaskText: { color: COLORS.text, fontSize: 16, fontWeight: '500' },
+  swapActions: { flexDirection: 'row', gap: 12 },
+  swapButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  swapButtonPrimary: { backgroundColor: COLORS.swap },
+  swapButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  swapButtonTextPrimary: { color: COLORS.bg, fontSize: 15, fontWeight: '600' },
+
+  // Feature 35: Commitments
+  commitmentContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  commitmentCard: { backgroundColor: COLORS.surface, borderRadius: 24, padding: 28, width: '100%', maxWidth: 400 },
+  commitmentTitle: { color: COLORS.commitment, fontSize: 18, fontWeight: '600', marginBottom: 16 },
+  commitmentMessage: { color: COLORS.text, fontSize: 18, lineHeight: 26, marginBottom: 8 },
+  commitmentDeadline: { color: COLORS.textDim, fontSize: 14, marginBottom: 24 },
+  commitmentActions: { flexDirection: 'row', gap: 12 },
+  commitmentButton: { flex: 1, padding: 16, borderRadius: 12, backgroundColor: COLORS.surfaceLight, alignItems: 'center' },
+  commitmentButtonPrimary: { backgroundColor: COLORS.commitment },
+  commitmentButtonText: { color: COLORS.textMuted, fontSize: 15, fontWeight: '500' },
+  commitmentButtonTextPrimary: { color: COLORS.text, fontSize: 15, fontWeight: '600' },
+
+  // Settings - New Feature Buttons
+  featureButton: { backgroundColor: COLORS.surfaceLight, padding: 16, borderRadius: 12, alignItems: 'center' },
+  featureButtonText: { color: COLORS.text, fontSize: 15, fontWeight: '500' },
+  featurePreview: { backgroundColor: COLORS.surfaceLight, padding: 14, borderRadius: 12 },
+  featurePreviewText: { color: COLORS.text, fontSize: 14 },
+  featurePreviewMore: { color: COLORS.textMuted, fontSize: 12, marginTop: 4 },
 });
