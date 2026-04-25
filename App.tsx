@@ -2033,33 +2033,42 @@ export default function App() {
 
   // Feature 10: Medication Reminder Check
   useEffect(() => {
-    if (medicationReminders.length > 0) {
-      const checkMeds = setInterval(() => {
-        const now = new Date();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-        const today = now.getDay();
+    if (medicationReminders.length === 0) return;
+    // Window in minutes for catching a scheduled time. Strict minute-equality
+    // missed reminders whenever the interval drifted past the boundary or the
+    // tab was backgrounded; this window catches any scheduled time that fell
+    // in the last 15 minutes (and hasn't been taken today yet).
+    const WINDOW_MIN = 15;
 
-        for (const reminder of medicationReminders) {
-          if (!reminder.enabled || !reminder.days.includes(today)) continue;
+    const checkMeds = () => {
+      if (pendingMedReminder) return;
+      const now = new Date();
+      const today = now.getDay();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-          for (const time of reminder.times) {
-            const [h, m] = time.split(':');
-            const reminderTime = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+      for (const reminder of medicationReminders) {
+        if (!reminder.enabled || !reminder.days.includes(today)) continue;
 
-            if (currentTime === reminderTime) {
-              const lastTaken = reminder.lastTaken ? new Date(reminder.lastTaken) : null;
-              const alreadyTakenToday = lastTaken && lastTaken.toDateString() === now.toDateString();
+        const lastTaken = reminder.lastTaken ? new Date(reminder.lastTaken) : null;
+        const alreadyTakenToday = lastTaken && lastTaken.toDateString() === now.toDateString();
+        if (alreadyTakenToday) continue;
 
-              if (!alreadyTakenToday && !pendingMedReminder) {
-                setPendingMedReminder(reminder);
-                setShowMedReminder(true);
-              }
-            }
+        for (const time of reminder.times) {
+          const [hStr, mStr] = time.split(':');
+          const reminderMinutes = (parseInt(hStr, 10) || 0) * 60 + (parseInt(mStr, 10) || 0);
+          const delta = nowMinutes - reminderMinutes;
+          if (delta >= 0 && delta <= WINDOW_MIN) {
+            setPendingMedReminder(reminder);
+            setShowMedReminder(true);
+            return;
           }
         }
-      }, 60000);
-      return () => clearInterval(checkMeds);
-    }
+      }
+    };
+
+    checkMeds();
+    const interval = setInterval(checkMeds, 60000);
+    return () => clearInterval(interval);
   }, [medicationReminders, pendingMedReminder]);
 
   // Feature 11: External Motivation Mode
