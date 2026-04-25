@@ -2692,8 +2692,13 @@ export default function App() {
 
   // Feature 10: Medication Reminder Response
   const handleMedReminderResponse = async (taken: boolean) => {
-    if (pendingMedReminder && taken && syncEnabled && SupabaseService.userId) {
-      await SupabaseService.markMedicationTaken(pendingMedReminder.id);
+    if (pendingMedReminder && taken) {
+      // Update local state so the reminder check effect (which gates on
+      // reminder.lastTaken) doesn't re-prompt for the same dose seconds later.
+      const reminderId = pendingMedReminder.id;
+      const takenAt = new Date().toISOString();
+      setMedicationReminders(prev => prev.map(r => r.id === reminderId ? { ...r, lastTaken: takenAt } : r));
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.markMedicationTaken(reminderId);
     }
     setShowMedReminder(false);
     setPendingMedReminder(null);
