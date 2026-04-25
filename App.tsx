@@ -1587,7 +1587,18 @@ const analyzeMessage = (message: string): { completions: string[], newTasks: str
 const SwipeableTask = ({ task, onComplete, onDelete }: { task: Task; onComplete: () => void; onDelete: () => void }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const [swiping, setSwiping] = useState<'none' | 'left' | 'right'>('none');
-  
+
+  // PanResponder is created once, so the closures it captures get stale as
+  // soon as the parent re-renders with new onComplete/onDelete (which it does
+  // every render — they're inline arrows). Route through refs so the gesture
+  // handler always invokes the latest callbacks; otherwise completing a task
+  // via swipe runs the first-render callback and clobbers any state the
+  // parent has updated since (most notably wiping new messages because the
+  // captured `messages` array is stale).
+  const onCompleteRef = useRef(onComplete);
+  const onDeleteRef = useRef(onDelete);
+  useEffect(() => { onCompleteRef.current = onComplete; onDeleteRef.current = onDelete; });
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10,
@@ -1600,9 +1611,9 @@ const SwipeableTask = ({ task, onComplete, onDelete }: { task: Task; onComplete:
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dx > 100) {
-          Animated.timing(translateX, { toValue: 400, duration: 200, useNativeDriver: true }).start(() => onComplete());
+          Animated.timing(translateX, { toValue: 400, duration: 200, useNativeDriver: true }).start(() => onCompleteRef.current());
         } else if (gestureState.dx < -100) {
-          Animated.timing(translateX, { toValue: -400, duration: 200, useNativeDriver: true }).start(() => onDelete());
+          Animated.timing(translateX, { toValue: -400, duration: 200, useNativeDriver: true }).start(() => onDeleteRef.current());
         } else {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
         }
