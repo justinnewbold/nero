@@ -2754,18 +2754,22 @@ export default function App() {
   useEffect(() => {
     if (crisisMode) {
       const pattern = BREATHING_PATTERNS.calm;
+      const timeouts: ReturnType<typeof setTimeout>[] = [];
       const breathingCycle = () => {
         setBreathingPhase('inhale');
-        setTimeout(() => setBreathingPhase('hold'), pattern.inhale * 1000);
-        setTimeout(() => {
+        timeouts.push(setTimeout(() => setBreathingPhase('hold'), pattern.inhale * 1000));
+        timeouts.push(setTimeout(() => {
           setBreathingPhase('exhale');
           setBreathingCount(prev => prev + 1);
-        }, (pattern.inhale + pattern.hold) * 1000);
+        }, (pattern.inhale + pattern.hold) * 1000));
       };
 
       breathingCycle();
       const interval = setInterval(breathingCycle, (pattern.inhale + pattern.hold + pattern.exhale) * 1000);
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        timeouts.forEach(clearTimeout);
+      };
     }
   }, [crisisMode]);
 
