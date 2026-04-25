@@ -2370,8 +2370,9 @@ export default function App() {
       setShowTransitionSupport(true);
     }
 
-    // Save focus session
-    if (bodyDoubleSession && syncEnabled && SupabaseService.userId) {
+    // Save focus session — always record locally so stats work offline; sync
+    // to the cloud only when sync is on.
+    if (bodyDoubleSession) {
       const focusSession: FocusSession = {
         id: generateId(),
         taskId: bodyDoubleSession.taskId,
@@ -2384,13 +2385,14 @@ export default function App() {
         timeOfDay: getTimeOfDay(),
         dayOfWeek: getDayOfWeek(),
       };
-      await SupabaseService.saveFocusSession(focusSession);
       setFocusSessions(prev => [focusSession, ...prev]);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveFocusSession(focusSession);
     }
 
-    if (bodyDoubleSession?.taskId && completed && syncEnabled) {
-      await SupabaseService.completeTask(bodyDoubleSession.taskId, currentEnergy || undefined);
-      setOpenTasks(prev => prev.filter(t => t.id !== bodyDoubleSession.taskId));
+    if (bodyDoubleSession?.taskId && completed) {
+      const completedTaskId = bodyDoubleSession.taskId;
+      setOpenTasks(prev => prev.filter(t => t.id !== completedTaskId));
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.completeTask(completedTaskId, currentEnergy || undefined);
     }
 
     const durationStr = formatDuration(duration);
