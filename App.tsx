@@ -2192,9 +2192,10 @@ export default function App() {
       if (!storedDeviceId) { storedDeviceId = generateDeviceId(); await AsyncStorage.setItem('@nero/deviceId', storedDeviceId); }
       setDeviceId(storedDeviceId);
 
-      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled, savedLastEnergy] = await Promise.all([
+      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled, savedLastEnergy, savedQuietHours] = await Promise.all([
         AsyncStorage.getItem('@nero/apiKey'), AsyncStorage.getItem('@nero/voiceEnabled'), AsyncStorage.getItem('@nero/autoSpeak'),
         AsyncStorage.getItem('@nero/nudgesEnabled'), AsyncStorage.getItem('@nero/syncEnabled'), AsyncStorage.getItem('@nero/lastEnergyCheck'),
+        AsyncStorage.getItem('@nero/quietHours'),
       ]);
 
       if (savedApiKey) setApiKey(JSON.parse(savedApiKey));
@@ -2203,6 +2204,7 @@ export default function App() {
       if (savedNudgesEnabled !== null) setNudgesEnabled(JSON.parse(savedNudgesEnabled));
       if (savedSyncEnabled !== null) setSyncEnabled(JSON.parse(savedSyncEnabled));
       if (savedLastEnergy) setLastEnergyCheck(savedLastEnergy);
+      if (savedQuietHours) setQuietHours(JSON.parse(savedQuietHours));
 
       const shouldSync = savedSyncEnabled === null ? true : JSON.parse(savedSyncEnabled);
       
@@ -2256,6 +2258,7 @@ export default function App() {
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/autoSpeak', JSON.stringify(autoSpeak)); }, [autoSpeak, isLoading]);
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/nudgesEnabled', JSON.stringify(nudgesEnabled)); }, [nudgesEnabled, isLoading]);
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled)); }, [syncEnabled, isLoading]);
+  useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/quietHours', JSON.stringify(quietHours)); }, [quietHours, isLoading]);
 
   const saveData = useCallback(async (newMessages: Message[], newMemory: UserMemory) => {
     await Promise.all([AsyncStorage.setItem('@nero/messages', JSON.stringify(newMessages.slice(-100))), AsyncStorage.setItem('@nero/memory', JSON.stringify(newMemory))]);
