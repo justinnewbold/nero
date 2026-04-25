@@ -2476,12 +2476,14 @@ export default function App() {
     updatedMemory.facts.lastSeen = new Date().toISOString();
     setMemory(updatedMemory);
 
+    let tasksForContext = openTasks;
     if (syncEnabled && SupabaseService.userId) {
       const freshTasks = await SupabaseService.getOpenTasks();
       setOpenTasks(freshTasks);
+      tasksForContext = freshTasks;
     }
 
-    const response = await callNero(newMessages, updatedMemory, patterns, currentEnergy, openTasks, apiKey, isVoice, bodyDoubleMode);
+    const response = await callNero(newMessages, updatedMemory, patterns, currentEnergy, tasksForContext, apiKey, isVoice, bodyDoubleMode);
     const neroMessage: Message = { id: generateId(), role: 'nero', content: response, timestamp: new Date().toISOString() };
     const finalMessages = [...newMessages, neroMessage];
     setMessages(finalMessages);
