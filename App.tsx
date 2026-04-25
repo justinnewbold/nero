@@ -3127,6 +3127,9 @@ export default function App() {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.clearMessages();
     const confirm: Message = { id: generateId(), role: 'nero', content: "Fresh start. I still remember you.", timestamp: new Date().toISOString() };
     setMessages([confirm]);
+    // Also clear the local cache; otherwise the next offline load restores the
+    // messages the user just deleted.
+    await AsyncStorage.setItem('@nero/messages', JSON.stringify([confirm]));
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(confirm);
     setShowSettings(false);
   };
