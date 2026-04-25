@@ -1827,6 +1827,9 @@ export default function App() {
   // Feature 16: Where Was I Recovery
   const [showRecovery, setShowRecovery] = useState(false);
   const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
+  // Captured at load before lastSeen is bumped to "now", so the recovery
+  // check can see how long the user was actually away.
+  const [previousLastSeen, setPreviousLastSeen] = useState<string | null>(null);
 
   // Feature 17: Decision Fatigue Helper
   const [showDecisionHelper, setShowDecisionHelper] = useState(false);
@@ -2109,21 +2112,21 @@ export default function App() {
 
   // Feature 16: Check for recovery mode on app load
   useEffect(() => {
-    if (!isLoading && memory.facts.lastSeen) {
-      const shouldRecover = shouldShowRecovery(memory.facts.lastSeen);
+    if (!isLoading && previousLastSeen) {
+      const shouldRecover = shouldShowRecovery(previousLastSeen);
       if (shouldRecover && messages.length > 1) {
         const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
         const context: SessionContext = {
           lastActiveTask: bodyDoubleSession?.taskDescription,
           lastTopic: lastUserMessage?.content.slice(0, 50),
-          lastActivity: memory.facts.lastSeen,
-          awayDuration: calculateAwayDuration(memory.facts.lastSeen),
+          lastActivity: previousLastSeen,
+          awayDuration: calculateAwayDuration(previousLastSeen),
         };
         setSessionContext(context);
         setShowRecovery(true);
       }
     }
-  }, [isLoading]);
+  }, [isLoading, previousLastSeen]);
 
   // Feature 19: Time blindness anchors during focus
   useEffect(() => {
@@ -2206,7 +2209,7 @@ export default function App() {
             SupabaseService.getCommitments(), SupabaseService.getFlexibleRoutines(),
             SupabaseService.getEmotionalHistory(14),
           ]);
-          if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
+          if (cloudMemory) { setPreviousLastSeen(cloudMemory.facts.lastSeen); cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
           if (cloudMessages.length > 0) setMessages(cloudMessages);
           else {
             const welcome: Message = { id: generateId(), role: 'nero', content: "Hey. I'm Nero. I'm here to help you get things done - by actually knowing you. What's on your mind?", timestamp: new Date().toISOString() };
@@ -2230,7 +2233,7 @@ export default function App() {
   const loadLocalData = async () => {
     const [savedMessages, savedMemory] = await Promise.all([AsyncStorage.getItem('@nero/messages'), AsyncStorage.getItem('@nero/memory')]);
     if (savedMessages) setMessages(JSON.parse(savedMessages));
-    if (savedMemory) { const m = JSON.parse(savedMemory); m.facts.lastSeen = new Date().toISOString(); m.facts.totalConversations += 1; setMemory(m); }
+    if (savedMemory) { const m = JSON.parse(savedMemory); setPreviousLastSeen(m.facts.lastSeen); m.facts.lastSeen = new Date().toISOString(); m.facts.totalConversations += 1; setMemory(m); }
     else {
       const welcome: Message = { id: generateId(), role: 'nero', content: "Hey. I'm Nero. I'm here to help you get things done - by actually knowing you. What's on your mind?", timestamp: new Date().toISOString() };
       setMessages([welcome]);
