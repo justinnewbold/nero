@@ -1948,6 +1948,9 @@ export default function App() {
   useEffect(() => {
     if (bodyDoubleMode && bodyDoubleSession) {
       bodyDoubleTimer.current = setInterval(() => {
+        // Don't keep re-firing (and re-vibrating) while the user is already
+        // looking at the check-in modal — wait for them to respond.
+        if (showBodyDoubleCheckIn) return;
         const timeSinceLastCheckIn = Date.now() - new Date(bodyDoubleSession.lastCheckIn).getTime();
         const checkInInterval = (8 + Math.random() * 7) * 60 * 1000;
         if (timeSinceLastCheckIn > checkInInterval) {
@@ -1957,7 +1960,7 @@ export default function App() {
       }, 60000);
       return () => { if (bodyDoubleTimer.current) clearInterval(bodyDoubleTimer.current); };
     }
-  }, [bodyDoubleMode, bodyDoubleSession]);
+  }, [bodyDoubleMode, bodyDoubleSession, showBodyDoubleCheckIn]);
 
   useEffect(() => {
     if (isRecording) {
