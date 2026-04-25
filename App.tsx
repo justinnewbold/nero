@@ -1554,14 +1554,32 @@ const getFallbackResponse = (messages: Message[], memory: UserMemory, energy: nu
   return "I'm here. What do you need?";
 };
 
+const NAME_BLOCKLIST = new Set([
+  'tired','hungry','sad','happy','angry','anxious','scared','ready','sorry','fine',
+  'okay','ok','good','bad','busy','here','there','going','doing','working','late',
+  'early','sick','well','alone','lonely','glad','mad','excited','exhausted','stressed',
+  'overwhelmed','frustrated','done','back','home','sure','trying','thinking','feeling',
+  'still','really','always','never','sometimes','off','better','worse','great','terrible',
+  'fed','bored','confused','lost','stuck','struggling','depressed','hopeful','grateful',
+  'proud','guilty','ashamed','worried','nervous','calm','peaceful','annoyed','irritated',
+]);
+
 const analyzeMessage = (message: string): { completions: string[], newTasks: string[], memories: string[] } => {
   const completions: string[] = [], newTasks: string[] = [], memories: string[] = [];
   const completionPatterns = [/(?:I |just |finally )(?:did|finished|completed|done with) (.+?)(?:\.|!|$)/gi];
   for (const p of completionPatterns) { let m; while ((m = p.exec(message)) !== null) { const t = m[1].trim(); if (t.length > 3 && t.length < 100) completions.push(t); } }
   const taskPatterns = [/I (?:need|have|want|should|will|'ll|gotta) (?:to )?(.+?)(?:\.|!|$)/gi];
   for (const p of taskPatterns) { let m; while ((m = p.exec(message)) !== null) { const t = m[1].trim(); if (t.length > 5 && t.length < 100 && !t.includes('?')) newTasks.push(t); } }
-  const nameMatch = message.match(/(?:I'm|I am|my name is|call me)\s+([A-Z][a-z]+)/i);
-  if (nameMatch) memories.push(`NAME: ${nameMatch[1]}`);
+  // Match the lead-in case-insensitively but validate the captured name is actually
+  // a capitalized proper noun. The prior /i flag silently neutralized [A-Z][a-z]+
+  // and caused "I'm tired" / "I am sad" to be saved as the user's name.
+  const nameMatch = message.match(/(?:I'm|I am|my name is|call me)\s+([A-Za-z]+)/i);
+  if (nameMatch) {
+    const candidate = nameMatch[1];
+    if (/^[A-Z][a-z]+$/.test(candidate) && !NAME_BLOCKLIST.has(candidate.toLowerCase())) {
+      memories.push(`NAME: ${candidate}`);
+    }
+  }
   return { completions, newTasks, memories };
 };
 
