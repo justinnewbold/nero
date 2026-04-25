@@ -2166,7 +2166,7 @@ export default function App() {
         try {
           setSyncStatus('syncing');
           await SupabaseService.initialize(storedDeviceId);
-          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions, cloudTimeBlocks, cloudWaiting, cloudMeds, cloudRoutines, cloudContexts] = await Promise.all([
+          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions, cloudTimeBlocks, cloudWaiting, cloudMeds, cloudRoutines, cloudContexts, cloudImpulses, cloudSocial, cloudRelationships, cloudWins, cloudCommitments, cloudFlexRoutines, cloudEmotional] = await Promise.all([
             SupabaseService.getMemory(), SupabaseService.getMessages(100), SupabaseService.getPatterns(),
             SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30), SupabaseService.getFocusSessions(30),
             SupabaseService.getTimeBlocks(), SupabaseService.getWaitingItems(), SupabaseService.getMedicationReminders(),
@@ -2186,6 +2186,9 @@ export default function App() {
           setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted); setFocusSessions(cloudSessions);
           setTimeBlocks(cloudTimeBlocks); setWaitingItems(cloudWaiting); setMedicationReminders(cloudMeds);
           setRoutines(cloudRoutines); setEnergyContexts(cloudContexts);
+          setDelayedImpulses(cloudImpulses); setSocialInteractions(cloudSocial); setRelationshipReminders(cloudRelationships);
+          setWinEntries(cloudWins); setCommitments(cloudCommitments); setFlexibleRoutines(cloudFlexRoutines);
+          setEmotionalHistory(cloudEmotional);
           SupabaseService.analyzePatterns();
           setSyncStatus('synced');
         } catch { setSyncStatus('offline'); await loadLocalData(); }
