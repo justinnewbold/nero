@@ -1060,16 +1060,40 @@ const VoiceService = {
     VoiceService.recognition.start();
   },
   stopListening: () => { if (VoiceService.recognition) VoiceService.recognition.stop(); },
-  speak: (text: string, onEnd?: () => void) => {
-    if (!VoiceService.synthesis) return;
-    VoiceService.synthesis.cancel();
+  // getVoices() returns [] until voices are loaded asynchronously; wait for the
+  // voiceschanged event the first time so the preferred voice actually gets picked.
+  getVoicesAsync: (): Promise<any[]> => {
+    return new Promise(resolve => {
+      const synth = VoiceService.synthesis;
+      if (!synth) { resolve([]); return; }
+      const existing = synth.getVoices();
+      if (existing && existing.length > 0) { resolve(existing); return; }
+      const handler = () => {
+        synth.removeEventListener?.('voiceschanged', handler);
+        resolve(synth.getVoices() || []);
+      };
+      synth.addEventListener?.('voiceschanged', handler);
+      // Safety net: some browsers never fire voiceschanged.
+      setTimeout(() => {
+        synth.removeEventListener?.('voiceschanged', handler);
+        resolve(synth.getVoices() || []);
+      }, 1000);
+    });
+  },
+  speak: async (text: string, onEnd?: () => void) => {
+    const synth = VoiceService.synthesis;
+    if (!synth) { onEnd?.(); return; }
+    synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.0;
-    const voices = VoiceService.synthesis.getVoices();
+    const voices = await VoiceService.getVoicesAsync();
     const voice = voices.find((v: any) => v.name.includes('Samantha')) || voices.find((v: any) => v.lang.startsWith('en'));
     if (voice) u.voice = voice;
-    if (onEnd) u.onend = onEnd;
-    VoiceService.synthesis.speak(u);
+    let finished = false;
+    const finish = () => { if (finished) return; finished = true; onEnd?.(); };
+    u.onend = finish;
+    u.onerror = finish;
+    synth.speak(u);
   },
   stopSpeaking: () => { if (VoiceService.synthesis) VoiceService.synthesis.cancel(); }
 };
