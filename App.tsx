@@ -933,17 +933,19 @@ const FocusAnalytics = {
     }
 
     // Current streak (consecutive days with completed sessions)
-    const sortedByDate = [...sessions].filter(s => s.completed).sort((a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime());
+    const completedDays = new Set<number>();
+    sessions.forEach(s => {
+      if (s.completed) completedDays.add(new Date(s.endedAt).setHours(0, 0, 0, 0));
+    });
     let currentStreak = 0;
-    if (sortedByDate.length > 0) {
-      const today = new Date().setHours(0, 0, 0, 0);
-      let checkDate = today;
-      for (const session of sortedByDate) {
-        const sessionDate = new Date(session.endedAt).setHours(0, 0, 0, 0);
-        if (sessionDate === checkDate || sessionDate === checkDate - 86400000) {
-          if (sessionDate !== checkDate) checkDate = sessionDate;
-          currentStreak++;
-        } else break;
+    if (completedDays.size > 0) {
+      const cursor = new Date();
+      cursor.setHours(0, 0, 0, 0);
+      // Allow the streak to start either today or yesterday so a missed today doesn't reset it.
+      if (!completedDays.has(cursor.getTime())) cursor.setDate(cursor.getDate() - 1);
+      while (completedDays.has(cursor.getTime())) {
+        currentStreak++;
+        cursor.setDate(cursor.getDate() - 1);
       }
     }
 
