@@ -1529,7 +1529,7 @@ const callNero = async (messages: Message[], memory: UserMemory, patterns: Patte
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: isVoice ? 150 : 500, system: `${systemPrompt}\n\n${parts.join('\n')}`, messages: conversationHistory }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: isVoice ? 150 : 500, system: `${systemPrompt}\n\n${parts.join('\n')}`, messages: conversationHistory }),
     });
     if (!response.ok) throw new Error('API failed');
     const data = await response.json();
@@ -2502,11 +2502,11 @@ export default function App() {
     
     for (const completion of analysis.completions) {
       const matchingTask = openTasks.find(t => t.description.toLowerCase().includes(completion.toLowerCase()) || completion.toLowerCase().includes(t.description.toLowerCase()));
-      if (matchingTask && syncEnabled) {
-        await SupabaseService.completeTask(matchingTask.id, currentEnergy || undefined);
+      if (matchingTask) {
         setOpenTasks(prev => prev.filter(t => t.id !== matchingTask.id));
         setCompletedTasks(prev => [{ ...matchingTask, status: 'completed', completedAt: new Date().toISOString() }, ...prev]);
-        
+        if (syncEnabled && SupabaseService.userId) await SupabaseService.completeTask(matchingTask.id, currentEnergy || undefined);
+
         if (bodyDoubleMode && bodyDoubleSession?.taskId === matchingTask.id) {
           await endBodyDoubleMode(true);
           setIsThinking(false);
@@ -2514,10 +2514,23 @@ export default function App() {
         }
       }
     }
-    
-    for (const task of analysis.newTasks) {
-      if (syncEnabled && SupabaseService.userId) await SupabaseService.createTask(task, currentEnergy || undefined);
-      if (!updatedMemory.threads.commitments.includes(task)) updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), task];
+
+    for (const description of analysis.newTasks) {
+      // Always reflect new tasks locally so they show up in openTasks even
+      // when offline; sync to Supabase when enabled. The Supabase id is used
+      // when available so subsequent ops match the cloud row.
+      const cloudId = (syncEnabled && SupabaseService.userId)
+        ? await SupabaseService.createTask(description, currentEnergy || undefined)
+        : '';
+      const newTask: Task = {
+        id: cloudId || generateId(),
+        description,
+        status: 'open',
+        createdAt: new Date().toISOString(),
+        energyAtCreation: currentEnergy || undefined,
+      };
+      setOpenTasks(prev => [...prev, newTask]);
+      if (!updatedMemory.threads.commitments.includes(description)) updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), description];
     }
     
     for (const mem of analysis.memories) {
