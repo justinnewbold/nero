@@ -1946,16 +1946,18 @@ export default function App() {
 
   // Breathing animation for body double mode
   useEffect(() => {
-    if (bodyDoubleMode) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(breatheAnim, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
-          Animated.timing(breatheAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
+    if (!bodyDoubleMode) {
       breatheAnim.setValue(1);
+      return;
     }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheAnim, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => { loop.stop(); breatheAnim.setValue(1); };
   }, [bodyDoubleMode]);
 
   // Body double check-ins
@@ -1977,12 +1979,16 @@ export default function App() {
   }, [bodyDoubleMode, bodyDoubleSession, showBodyDoubleCheckIn]);
 
   useEffect(() => {
-    if (isRecording) {
-      Animated.loop(Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      ])).start();
-    } else { pulseAnim.setValue(1); }
+    if (!isRecording) {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => { loop.stop(); pulseAnim.setValue(1); };
   }, [isRecording]);
 
   useEffect(() => {
@@ -3087,7 +3093,7 @@ export default function App() {
   };
 
   // Feature 33: Sensory Overload Mode
-  const toggleSensoryOverload = () => {
+  const toggleSensoryOverload = async () => {
     setSensoryOverloadMode(prev => !prev);
     if (!sensoryOverloadMode) {
       // Entering overload mode
@@ -3096,8 +3102,8 @@ export default function App() {
         content: "Simplified mode on. Less noise. Just breathe.",
         timestamp: new Date().toISOString(),
       };
-      const newMessages = [...messages, neroMessage];
-      setMessages(newMessages);
+      setMessages(prev => [...prev, neroMessage]);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
     }
   };
 
@@ -3211,7 +3217,14 @@ export default function App() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.skipButton} onPress={() => setShowEnergyCheck(false)}><Text style={styles.skipButtonText}>Skip</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.skipButton} onPress={() => {
+              // Record the dismissal so the auto-prompt effect doesn't pop the
+              // modal back open 2 seconds after the next message.
+              const now = new Date().toISOString();
+              setLastEnergyCheck(now);
+              AsyncStorage.setItem('@nero/lastEnergyCheck', now);
+              setShowEnergyCheck(false);
+            }}><Text style={styles.skipButtonText}>Skip</Text></TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
