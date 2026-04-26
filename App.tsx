@@ -1753,6 +1753,9 @@ export default function App() {
   const [bodyDoubleMode, setBodyDoubleMode] = useState(false);
   const [bodyDoubleSession, setBodyDoubleSession] = useState<BodyDoubleSession | null>(null);
   const [showBodyDoubleCheckIn, setShowBodyDoubleCheckIn] = useState(false);
+  // Picked when the check-in modal opens so the prompt text doesn't flicker
+  // as unrelated state changes re-render the parent.
+  const [checkInPrompt, setCheckInPrompt] = useState('');
   const bodyDoubleTimer = useRef<NodeJS.Timeout | null>(null);
   
   // Focus Analytics
@@ -1970,6 +1973,7 @@ export default function App() {
         const timeSinceLastCheckIn = Date.now() - new Date(bodyDoubleSession.lastCheckIn).getTime();
         const checkInInterval = (8 + Math.random() * 7) * 60 * 1000;
         if (timeSinceLastCheckIn > checkInInterval) {
+          setCheckInPrompt(BODY_DOUBLE_CHECK_INS[Math.floor(Math.random() * BODY_DOUBLE_CHECK_INS.length)]);
           setShowBodyDoubleCheckIn(true);
           if (Platform.OS !== 'web') Vibration.vibrate(100);
         }
@@ -2043,15 +2047,23 @@ export default function App() {
 
   // Feature 1: Time Block Notifications
   useEffect(() => {
-    if (timeBlocks.length > 0) {
-      const checkBlocks = setInterval(() => {
-        const upcoming = getUpcomingTimeBlock(timeBlocks);
-        if (upcoming && (!upcomingBlock || upcoming.id !== upcomingBlock.id)) {
-          setUpcomingBlock(upcoming);
-        }
-      }, 60000);
-      return () => clearInterval(checkBlocks);
+    if (timeBlocks.length === 0) {
+      if (upcomingBlock) setUpcomingBlock(null);
+      return;
     }
+    const checkBlocks = () => {
+      const upcoming = getUpcomingTimeBlock(timeBlocks);
+      if (upcoming) {
+        if (!upcomingBlock || upcoming.id !== upcomingBlock.id) setUpcomingBlock(upcoming);
+      } else if (upcomingBlock) {
+        // The previously-flagged block has started or moved out of the
+        // 30-minute window; clear it so the banner doesn't linger forever.
+        setUpcomingBlock(null);
+      }
+    };
+    checkBlocks();
+    const interval = setInterval(checkBlocks, 60000);
+    return () => clearInterval(interval);
   }, [timeBlocks, upcomingBlock]);
 
   // Feature 10: Medication Reminder Check
@@ -2774,6 +2786,28 @@ export default function App() {
 
   // Feature 15: Crisis Mode
   const enterCrisisMode = () => {
+    // If a body-double session is in progress, persist it as an incomplete
+    // focus session before tearing it down — otherwise the user loses the
+    // entire session record (no entry in stats, nothing in Supabase).
+    if (bodyDoubleSession) {
+      const focusSession: FocusSession = {
+        id: generateId(),
+        taskId: bodyDoubleSession.taskId,
+        taskDescription: bodyDoubleSession.taskDescription,
+        startedAt: bodyDoubleSession.startedAt,
+        endedAt: new Date().toISOString(),
+        durationMs: Date.now() - new Date(bodyDoubleSession.startedAt).getTime(),
+        completed: false,
+        checkInCount: bodyDoubleSession.checkInCount,
+        timeOfDay: getTimeOfDay(),
+        dayOfWeek: getDayOfWeek(),
+      };
+      setFocusSessions(prev => [focusSession, ...prev]);
+      setBodyDoubleSession(null);
+      // Fire-and-forget so the crisis UI shows immediately, not after a
+      // possibly-slow cloud round-trip.
+      if (syncEnabled && SupabaseService.userId) SupabaseService.saveFocusSession(focusSession);
+    }
     setCrisisMode(true);
     setBodyDoubleMode(false);
     setBreathingPhase('inhale');
@@ -3181,12 +3215,11 @@ export default function App() {
 
   // Body Double Check-in
   if (showBodyDoubleCheckIn && bodyDoubleMode) {
-    const checkInMessage = BODY_DOUBLE_CHECK_INS[Math.floor(Math.random() * BODY_DOUBLE_CHECK_INS.length)];
     return (
       <SafeAreaView style={[styles.container, styles.bodyDoubleContainer]}>
         <StatusBar style="light" />
         <View style={styles.checkInCard}>
-          <Text style={styles.checkInMessage}>{checkInMessage}</Text>
+          <Text style={styles.checkInMessage}>{checkInPrompt}</Text>
           <View style={styles.checkInButtons}>
             <TouchableOpacity style={styles.checkInButton} onPress={() => handleBodyDoubleCheckIn('good')}><Text style={styles.checkInButtonText}>👍 Good</Text></TouchableOpacity>
             <TouchableOpacity style={styles.checkInButton} onPress={() => handleBodyDoubleCheckIn('stuck')}><Text style={styles.checkInButtonText}>😕 Stuck</Text></TouchableOpacity>
