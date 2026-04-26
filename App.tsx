@@ -1521,9 +1521,16 @@ const callNero = async (messages: Message[], memory: UserMemory, patterns: Patte
   if (openTasks.length > 0) { parts.push('\nOPEN TASKS:'); openTasks.slice(0, 4).forEach(t => parts.push(`- "${t.description}" (${getRelativeTime(t.createdAt)})`)); }
   
   const systemPrompt = isVoice ? NERO_SYSTEM_PROMPT + '\n\nVOICE: 2-3 sentences max.' : NERO_SYSTEM_PROMPT;
-  const conversationHistory = messages.slice(-20).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+  // Anthropic requires the first message in `messages` to be a user turn.
+  // The slice can start with the welcome (role=nero), or with a Nero reply
+  // when the user just sent their second message early in the conversation,
+  // which 400s the request and silently falls through to the fallback.
+  const recent = messages.slice(-20);
+  const firstUserIdx = recent.findIndex(m => m.role === 'user');
+  const conversationHistory = (firstUserIdx === -1 ? [] : recent.slice(firstUserIdx))
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
 
-  if (!apiKey) return getFallbackResponse(messages, memory, currentEnergy, bodyDoubleMode);
+  if (!apiKey || conversationHistory.length === 0) return getFallbackResponse(messages, memory, currentEnergy, bodyDoubleMode);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1856,6 +1863,9 @@ export default function App() {
   // Feature 19: Time Blindness Anchors
   const [showTimeAnchor, setShowTimeAnchor] = useState(false);
   const [lastTimeAnchor, setLastTimeAnchor] = useState<string | null>(null);
+  // Picked when the anchor modal opens so the message text doesn't flicker
+  // as unrelated state changes re-render the parent.
+  const [timeAnchorMessage, setTimeAnchorMessage] = useState('');
 
   // Feature 20: Emotional Regulation
   const [showEmotionalCheck, setShowEmotionalCheck] = useState(false);
@@ -2163,6 +2173,7 @@ export default function App() {
       const anchorInterval = setInterval(() => {
         const hoursSinceAnchor = lastTimeAnchor ? (Date.now() - new Date(lastTimeAnchor).getTime()) / 3600000 : 999;
         if (hoursSinceAnchor >= 0.5) { // Every 30 minutes
+          setTimeAnchorMessage(TIME_ANCHOR_MESSAGES[Math.floor(Math.random() * TIME_ANCHOR_MESSAGES.length)]);
           setShowTimeAnchor(true);
           setLastTimeAnchor(new Date().toISOString());
         }
@@ -2664,7 +2675,10 @@ export default function App() {
     } else if (action === 'break') {
       content = "Smart. Take 5-10 minutes. Move around, drink water, rest your eyes. I'll be here.";
     } else {
-      await endBodyDoubleMode(true);
+      // Hyperfocus warning's "end" choice means take a forced break, not
+      // "I finished the task". Pass completed=false so endBodyDoubleMode
+      // doesn't mark the underlying task as done and pull it from openTasks.
+      await endBodyDoubleMode(false);
       return;
     }
 
@@ -3484,7 +3498,7 @@ export default function App() {
         <StatusBar style="light" />
         <View style={styles.timeAnchorCard}>
           <Text style={styles.timeAnchorTitle}>Time Check</Text>
-          <Text style={styles.timeAnchorMessage}>{TIME_ANCHOR_MESSAGES[Math.floor(Math.random() * TIME_ANCHOR_MESSAGES.length)].replace('{duration}', timeString)}</Text>
+          <Text style={styles.timeAnchorMessage}>{timeAnchorMessage.replace('{duration}', timeString)}</Text>
           <TouchableOpacity style={styles.timeAnchorButton} onPress={handleTimeAnchorDismiss}>
             <Text style={styles.timeAnchorButtonText}>Got it</Text>
           </TouchableOpacity>
