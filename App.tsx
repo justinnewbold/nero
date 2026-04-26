@@ -2022,14 +2022,14 @@ export default function App() {
   useEffect(() => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }, [messages]);
 
   useEffect(() => {
-    if (!isLoading && syncEnabled && !showEnergyCheck && !showTaskSuggestion && !bodyDoubleMode && messages.length > 0) {
+    if (!isLoading && !showEnergyCheck && !showTaskSuggestion && !bodyDoubleMode && messages.length > 0) {
       const now = Date.now();
       const lastCheck = lastEnergyCheck ? new Date(lastEnergyCheck).getTime() : 0;
       if ((now - lastCheck) / 3600000 > 4 && currentEnergy === null) {
         setTimeout(() => { if (!showSettings && !pendingNudge) setShowEnergyCheck(true); }, 2000);
       }
     }
-  }, [isLoading, syncEnabled, messages.length, lastEnergyCheck, currentEnergy, bodyDoubleMode]);
+  }, [isLoading, messages.length, lastEnergyCheck, currentEnergy, bodyDoubleMode]);
 
   // Calculate focus stats when sessions change
   useEffect(() => {
@@ -2288,6 +2288,12 @@ export default function App() {
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/nudgesEnabled', JSON.stringify(nudgesEnabled)); }, [nudgesEnabled, isLoading]);
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled)); }, [syncEnabled, isLoading]);
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/quietHours', JSON.stringify(quietHours)); }, [quietHours, isLoading]);
+  // Auto-persist messages whenever they change so handlers that just call
+  // setMessages (handleTaskComplete, handleBodyDoubleCheckIn, hyperfocus,
+  // RSD/shame/rumination support, etc.) don't have to remember to call
+  // saveData. Without this, those handlers' Nero replies were lost on
+  // offline reload because saveData was never invoked.
+  useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/messages', JSON.stringify(messages.slice(-100))); }, [messages, isLoading]);
 
   const saveData = useCallback(async (newMessages: Message[], newMemory: UserMemory) => {
     await Promise.all([AsyncStorage.setItem('@nero/messages', JSON.stringify(newMessages.slice(-100))), AsyncStorage.setItem('@nero/memory', JSON.stringify(newMemory))]);
@@ -2423,7 +2429,15 @@ export default function App() {
 
     if (bodyDoubleSession?.taskId && completed) {
       const completedTaskId = bodyDoubleSession.taskId;
-      setOpenTasks(prev => prev.filter(t => t.id !== completedTaskId));
+      // Move into completedTasks too so Today's Done / Done List / stats
+      // reflect tasks finished via body-double mode.
+      setOpenTasks(prev => {
+        const finished = prev.find(t => t.id === completedTaskId);
+        if (finished) {
+          setCompletedTasks(c => [{ ...finished, status: 'completed', completedAt: new Date().toISOString() }, ...c]);
+        }
+        return prev.filter(t => t.id !== completedTaskId);
+      });
       if (syncEnabled && SupabaseService.userId) await SupabaseService.completeTask(completedTaskId, currentEnergy || undefined);
     }
 
