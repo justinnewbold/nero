@@ -1855,6 +1855,11 @@ export default function App() {
   // Feature 17: Decision Fatigue Helper
   const [showDecisionHelper, setShowDecisionHelper] = useState(false);
   const [decidedTask, setDecidedTask] = useState<Task | null>(null);
+  // Random message picks captured when the modal opens so unrelated re-renders
+  // don't keep swapping the visible text mid-read.
+  const [decisionPrompt, setDecisionPrompt] = useState('');
+  const [shameMessage, setShameMessage] = useState('');
+  const [taskSwapMessage, setTaskSwapMessage] = useState('');
 
   // Feature 18: Dopamine Menu
   const [showDopamineMenu, setShowDopamineMenu] = useState(false);
@@ -2193,7 +2198,11 @@ export default function App() {
   useEffect(() => {
     const battery = calculateSocialBattery(socialInteractions);
     setSocialBattery(battery);
-  }, [socialInteractions]);
+    // Reset the dismissed flag once the battery has recovered, so the
+    // warning can fire again on later dips (including the next day, when
+    // calculateSocialBattery filters out yesterday's interactions).
+    if (battery > 5 && showSocialBattery) setShowSocialBattery(false);
+  }, [socialInteractions, showSocialBattery]);
 
   // Feature 25: Check overdue contacts
   useEffect(() => {
@@ -2373,13 +2382,14 @@ export default function App() {
   const handleBodyDoubleCheckIn = async (response: 'good' | 'stuck' | 'done' | 'break') => {
     setShowBodyDoubleCheckIn(false);
     
-    if (bodyDoubleSession) {
-      setBodyDoubleSession({
-        ...bodyDoubleSession,
-        lastCheckIn: new Date().toISOString(),
-        checkInCount: bodyDoubleSession.checkInCount + 1,
-      });
-    }
+    // Functional update so a concurrent message-side update of lastCheckIn
+    // (in sendMessage) can't clobber the checkInCount increment via stale
+    // closure.
+    setBodyDoubleSession(prev => prev ? {
+      ...prev,
+      lastCheckIn: new Date().toISOString(),
+      checkInCount: prev.checkInCount + 1,
+    } : prev);
 
     let content = '';
     if (response === 'good') {
@@ -2531,13 +2541,14 @@ export default function App() {
 
     // Feature 27: Shame Spiral Detection
     if (detectShameSpiral(text) && !showShameSupport) {
+      setShameMessage(SHAME_RESPONSES[Math.floor(Math.random() * SHAME_RESPONSES.length)]);
       setShowShameSupport(true);
       setIsThinking(false);
       return;
     }
 
     if (bodyDoubleMode && bodyDoubleSession) {
-      setBodyDoubleSession({ ...bodyDoubleSession, lastCheckIn: new Date().toISOString() });
+      setBodyDoubleSession(prev => prev ? { ...prev, lastCheckIn: new Date().toISOString() } : prev);
     }
 
     const analysis = analyzeMessage(text);
@@ -2899,6 +2910,7 @@ export default function App() {
   const handleDecisionHelp = () => {
     const picked = pickRandomTask(openTasks);
     setDecidedTask(picked);
+    setDecisionPrompt(DECISION_PROMPTS[Math.floor(Math.random() * DECISION_PROMPTS.length)]);
     setShowDecisionHelper(true);
   };
 
@@ -3174,6 +3186,7 @@ export default function App() {
     const current = bodyDoubleSession?.taskId ? openTasks.find(t => t.id === bodyDoubleSession.taskId) : null;
     const swap = findSwapTask(current || null, openTasks);
     setSwapSuggestion(swap);
+    setTaskSwapMessage(TASK_SWAP_MESSAGES[Math.floor(Math.random() * TASK_SWAP_MESSAGES.length)]);
     setShowTaskSwap(true);
   };
 
@@ -3455,7 +3468,7 @@ export default function App() {
         <View style={styles.decisionContainer}>
           <View style={styles.decisionCard}>
             <Text style={styles.decisionTitle}>I'll decide for you</Text>
-            <Text style={styles.decisionMessage}>{DECISION_PROMPTS[Math.floor(Math.random() * DECISION_PROMPTS.length)]}</Text>
+            <Text style={styles.decisionMessage}>{decisionPrompt}</Text>
             {decidedTask && (
               <View style={styles.decisionTaskCard}>
                 <Text style={styles.decisionTaskText}>{decidedTask.description}</Text>
@@ -3666,7 +3679,6 @@ export default function App() {
 
   // Feature 27: Shame Spiral Support
   if (showShameSupport) {
-    const shameMessage = SHAME_RESPONSES[Math.floor(Math.random() * SHAME_RESPONSES.length)];
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -3731,7 +3743,7 @@ export default function App() {
         <View style={styles.swapContainer}>
           <View style={styles.swapCard}>
             <Text style={styles.swapTitle}>Stuck? Try switching</Text>
-            <Text style={styles.swapMessage}>{TASK_SWAP_MESSAGES[Math.floor(Math.random() * TASK_SWAP_MESSAGES.length)]}</Text>
+            <Text style={styles.swapMessage}>{taskSwapMessage}</Text>
             <View style={styles.swapTaskCard}>
               <Text style={styles.swapTaskText}>{swapSuggestion.description}</Text>
             </View>
