@@ -2189,10 +2189,19 @@ export default function App() {
 
   // Feature 22: Check for ready impulses
   useEffect(() => {
-    const now = new Date().toISOString();
-    const ready = delayedImpulses.filter(i => i.delayUntil <= now && i.status === 'waiting');
-    setReadyImpulses(ready);
-  }, [delayedImpulses]);
+    // Recompute on data change AND on a 60s tick — the underlying arrays
+    // don't update on their own when a delay expires / a deadline passes,
+    // so without a tick the prompts wouldn't fire during an idle session.
+    const recompute = () => {
+      const now = new Date().toISOString();
+      setReadyImpulses(delayedImpulses.filter(i => i.delayUntil <= now && i.status === 'waiting'));
+      setOverdueCommitments(getOverdueCommitments(commitments));
+      setOverdueContacts(relationshipReminders.filter(needsContact));
+    };
+    recompute();
+    const interval = setInterval(recompute, 60000);
+    return () => clearInterval(interval);
+  }, [delayedImpulses, commitments, relationshipReminders]);
 
   // Feature 23: Calculate social battery
   useEffect(() => {
@@ -2204,12 +2213,6 @@ export default function App() {
     if (battery > 5 && showSocialBattery) setShowSocialBattery(false);
   }, [socialInteractions, showSocialBattery]);
 
-  // Feature 25: Check overdue contacts
-  useEffect(() => {
-    const overdue = relationshipReminders.filter(needsContact);
-    setOverdueContacts(overdue);
-  }, [relationshipReminders]);
-
   // Feature 31: Check quiet hours
   useEffect(() => {
     const checkQuiet = () => setIsInQuietHours(isQuietHours(quietHours));
@@ -2217,12 +2220,8 @@ export default function App() {
     const interval = setInterval(checkQuiet, 60000);
     return () => clearInterval(interval);
   }, [quietHours]);
-
-  // Feature 35: Check overdue commitments
-  useEffect(() => {
-    const overdue = getOverdueCommitments(commitments);
-    setOverdueCommitments(overdue);
-  }, [commitments]);
+  // overdueContacts and overdueCommitments are recomputed by the impulse
+  // tick effect above (it shares the same 60s cadence).
 
   const initializeApp = async () => {
     try {
@@ -2273,7 +2272,9 @@ export default function App() {
           setDelayedImpulses(cloudImpulses); setSocialInteractions(cloudSocial); setRelationshipReminders(cloudRelationships);
           setWinEntries(cloudWins); setCommitments(cloudCommitments); setFlexibleRoutines(cloudFlexRoutines);
           setEmotionalHistory(cloudEmotional);
-          SupabaseService.analyzePatterns();
+          // Pull patterns again after analyze inserts any new ones, otherwise
+          // the freshly-derived patterns wouldn't show up until the next reload.
+          SupabaseService.analyzePatterns().then(() => SupabaseService.getPatterns()).then(setPatterns).catch(() => {});
           setSyncStatus('synced');
         } catch { setSyncStatus('offline'); await loadLocalData(); }
       } else { setSyncStatus('offline'); await loadLocalData(); }
@@ -2473,17 +2474,24 @@ export default function App() {
   };
 
   const handleQuickAdd = async (description: string) => {
-    if (syncEnabled && SupabaseService.userId) {
-      await SupabaseService.createTask(description, currentEnergy || undefined);
-      const freshTasks = await SupabaseService.getOpenTasks();
-      setOpenTasks(freshTasks);
-    }
-    
+    // Always reflect the new task locally so it doesn't vanish when offline /
+    // sync is disabled. Use the Supabase id when available so subsequent ops
+    // line up with the cloud row.
+    const cloudId = (syncEnabled && SupabaseService.userId)
+      ? await SupabaseService.createTask(description, currentEnergy || undefined)
+      : '';
+    const newTask: Task = {
+      id: cloudId || generateId(),
+      description,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      energyAtCreation: currentEnergy || undefined,
+    };
+    setOpenTasks(prev => [...prev, newTask]);
+
     const neroMessage: Message = { id: generateId(), role: 'nero', content: `Got it. "${description}" - added.`, timestamp: new Date().toISOString() };
-    const newMessages = [...messages, neroMessage];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, neroMessage]);
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
-    await saveData(newMessages, memory);
   };
 
   const handleTaskComplete = async (task: Task) => {
