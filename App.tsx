@@ -933,17 +933,19 @@ const FocusAnalytics = {
     }
 
     // Current streak (consecutive days with completed sessions)
-    const sortedByDate = [...sessions].filter(s => s.completed).sort((a, b) => new Date(b.endedAt).getTime() - new Date(a.endedAt).getTime());
+    const completedDays = new Set<number>();
+    sessions.forEach(s => {
+      if (s.completed) completedDays.add(new Date(s.endedAt).setHours(0, 0, 0, 0));
+    });
     let currentStreak = 0;
-    if (sortedByDate.length > 0) {
-      const today = new Date().setHours(0, 0, 0, 0);
-      let checkDate = today;
-      for (const session of sortedByDate) {
-        const sessionDate = new Date(session.endedAt).setHours(0, 0, 0, 0);
-        if (sessionDate === checkDate || sessionDate === checkDate - 86400000) {
-          if (sessionDate !== checkDate) checkDate = sessionDate;
-          currentStreak++;
-        } else break;
+    if (completedDays.size > 0) {
+      const cursor = new Date();
+      cursor.setHours(0, 0, 0, 0);
+      // Allow the streak to start either today or yesterday so a missed today doesn't reset it.
+      if (!completedDays.has(cursor.getTime())) cursor.setDate(cursor.getDate() - 1);
+      while (completedDays.has(cursor.getTime())) {
+        currentStreak++;
+        cursor.setDate(cursor.getDate() - 1);
       }
     }
 
@@ -1058,16 +1060,40 @@ const VoiceService = {
     VoiceService.recognition.start();
   },
   stopListening: () => { if (VoiceService.recognition) VoiceService.recognition.stop(); },
-  speak: (text: string, onEnd?: () => void) => {
-    if (!VoiceService.synthesis) return;
-    VoiceService.synthesis.cancel();
+  // getVoices() returns [] until voices are loaded asynchronously; wait for the
+  // voiceschanged event the first time so the preferred voice actually gets picked.
+  getVoicesAsync: (): Promise<any[]> => {
+    return new Promise(resolve => {
+      const synth = VoiceService.synthesis;
+      if (!synth) { resolve([]); return; }
+      const existing = synth.getVoices();
+      if (existing && existing.length > 0) { resolve(existing); return; }
+      const handler = () => {
+        synth.removeEventListener?.('voiceschanged', handler);
+        resolve(synth.getVoices() || []);
+      };
+      synth.addEventListener?.('voiceschanged', handler);
+      // Safety net: some browsers never fire voiceschanged.
+      setTimeout(() => {
+        synth.removeEventListener?.('voiceschanged', handler);
+        resolve(synth.getVoices() || []);
+      }, 1000);
+    });
+  },
+  speak: async (text: string, onEnd?: () => void) => {
+    const synth = VoiceService.synthesis;
+    if (!synth) { onEnd?.(); return; }
+    synth.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.0;
-    const voices = VoiceService.synthesis.getVoices();
+    const voices = await VoiceService.getVoicesAsync();
     const voice = voices.find((v: any) => v.name.includes('Samantha')) || voices.find((v: any) => v.lang.startsWith('en'));
     if (voice) u.voice = voice;
-    if (onEnd) u.onend = onEnd;
-    VoiceService.synthesis.speak(u);
+    let finished = false;
+    const finish = () => { if (finished) return; finished = true; onEnd?.(); };
+    u.onend = finish;
+    u.onerror = finish;
+    synth.speak(u);
   },
   stopSpeaking: () => { if (VoiceService.synthesis) VoiceService.synthesis.cancel(); }
 };
@@ -1495,15 +1521,22 @@ const callNero = async (messages: Message[], memory: UserMemory, patterns: Patte
   if (openTasks.length > 0) { parts.push('\nOPEN TASKS:'); openTasks.slice(0, 4).forEach(t => parts.push(`- "${t.description}" (${getRelativeTime(t.createdAt)})`)); }
   
   const systemPrompt = isVoice ? NERO_SYSTEM_PROMPT + '\n\nVOICE: 2-3 sentences max.' : NERO_SYSTEM_PROMPT;
-  const conversationHistory = messages.slice(-20).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+  // Anthropic requires the first message in `messages` to be a user turn.
+  // The slice can start with the welcome (role=nero), or with a Nero reply
+  // when the user just sent their second message early in the conversation,
+  // which 400s the request and silently falls through to the fallback.
+  const recent = messages.slice(-20);
+  const firstUserIdx = recent.findIndex(m => m.role === 'user');
+  const conversationHistory = (firstUserIdx === -1 ? [] : recent.slice(firstUserIdx))
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
 
-  if (!apiKey) return getFallbackResponse(messages, memory, currentEnergy, bodyDoubleMode);
+  if (!apiKey || conversationHistory.length === 0) return getFallbackResponse(messages, memory, currentEnergy, bodyDoubleMode);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: isVoice ? 150 : 500, system: `${systemPrompt}\n\n${parts.join('\n')}`, messages: conversationHistory }),
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: isVoice ? 150 : 500, system: `${systemPrompt}\n\n${parts.join('\n')}`, messages: conversationHistory }),
     });
     if (!response.ok) throw new Error('API failed');
     const data = await response.json();
@@ -1528,14 +1561,32 @@ const getFallbackResponse = (messages: Message[], memory: UserMemory, energy: nu
   return "I'm here. What do you need?";
 };
 
+const NAME_BLOCKLIST = new Set([
+  'tired','hungry','sad','happy','angry','anxious','scared','ready','sorry','fine',
+  'okay','ok','good','bad','busy','here','there','going','doing','working','late',
+  'early','sick','well','alone','lonely','glad','mad','excited','exhausted','stressed',
+  'overwhelmed','frustrated','done','back','home','sure','trying','thinking','feeling',
+  'still','really','always','never','sometimes','off','better','worse','great','terrible',
+  'fed','bored','confused','lost','stuck','struggling','depressed','hopeful','grateful',
+  'proud','guilty','ashamed','worried','nervous','calm','peaceful','annoyed','irritated',
+]);
+
 const analyzeMessage = (message: string): { completions: string[], newTasks: string[], memories: string[] } => {
   const completions: string[] = [], newTasks: string[] = [], memories: string[] = [];
   const completionPatterns = [/(?:I |just |finally )(?:did|finished|completed|done with) (.+?)(?:\.|!|$)/gi];
   for (const p of completionPatterns) { let m; while ((m = p.exec(message)) !== null) { const t = m[1].trim(); if (t.length > 3 && t.length < 100) completions.push(t); } }
   const taskPatterns = [/I (?:need|have|want|should|will|'ll|gotta) (?:to )?(.+?)(?:\.|!|$)/gi];
   for (const p of taskPatterns) { let m; while ((m = p.exec(message)) !== null) { const t = m[1].trim(); if (t.length > 5 && t.length < 100 && !t.includes('?')) newTasks.push(t); } }
-  const nameMatch = message.match(/(?:I'm|I am|my name is|call me)\s+([A-Z][a-z]+)/i);
-  if (nameMatch) memories.push(`NAME: ${nameMatch[1]}`);
+  // Match the lead-in case-insensitively but validate the captured name is actually
+  // a capitalized proper noun. The prior /i flag silently neutralized [A-Z][a-z]+
+  // and caused "I'm tired" / "I am sad" to be saved as the user's name.
+  const nameMatch = message.match(/(?:I'm|I am|my name is|call me)\s+([A-Za-z]+)/i);
+  if (nameMatch) {
+    const candidate = nameMatch[1];
+    if (/^[A-Z][a-z]+$/.test(candidate) && !NAME_BLOCKLIST.has(candidate.toLowerCase())) {
+      memories.push(`NAME: ${candidate}`);
+    }
+  }
   return { completions, newTasks, memories };
 };
 
@@ -1543,7 +1594,18 @@ const analyzeMessage = (message: string): { completions: string[], newTasks: str
 const SwipeableTask = ({ task, onComplete, onDelete }: { task: Task; onComplete: () => void; onDelete: () => void }) => {
   const translateX = useRef(new Animated.Value(0)).current;
   const [swiping, setSwiping] = useState<'none' | 'left' | 'right'>('none');
-  
+
+  // PanResponder is created once, so the closures it captures get stale as
+  // soon as the parent re-renders with new onComplete/onDelete (which it does
+  // every render — they're inline arrows). Route through refs so the gesture
+  // handler always invokes the latest callbacks; otherwise completing a task
+  // via swipe runs the first-render callback and clobbers any state the
+  // parent has updated since (most notably wiping new messages because the
+  // captured `messages` array is stale).
+  const onCompleteRef = useRef(onComplete);
+  const onDeleteRef = useRef(onDelete);
+  useEffect(() => { onCompleteRef.current = onComplete; onDeleteRef.current = onDelete; });
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dx) > 10,
@@ -1556,9 +1618,9 @@ const SwipeableTask = ({ task, onComplete, onDelete }: { task: Task; onComplete:
       },
       onPanResponderRelease: (_, gestureState) => {
         if (gestureState.dx > 100) {
-          Animated.timing(translateX, { toValue: 400, duration: 200, useNativeDriver: true }).start(() => onComplete());
+          Animated.timing(translateX, { toValue: 400, duration: 200, useNativeDriver: true }).start(() => onCompleteRef.current());
         } else if (gestureState.dx < -100) {
-          Animated.timing(translateX, { toValue: -400, duration: 200, useNativeDriver: true }).start(() => onDelete());
+          Animated.timing(translateX, { toValue: -400, duration: 200, useNativeDriver: true }).start(() => onDeleteRef.current());
         } else {
           Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
         }
@@ -1698,6 +1760,9 @@ export default function App() {
   const [bodyDoubleMode, setBodyDoubleMode] = useState(false);
   const [bodyDoubleSession, setBodyDoubleSession] = useState<BodyDoubleSession | null>(null);
   const [showBodyDoubleCheckIn, setShowBodyDoubleCheckIn] = useState(false);
+  // Picked when the check-in modal opens so the prompt text doesn't flicker
+  // as unrelated state changes re-render the parent.
+  const [checkInPrompt, setCheckInPrompt] = useState('');
   const bodyDoubleTimer = useRef<NodeJS.Timeout | null>(null);
   
   // Focus Analytics
@@ -1783,10 +1848,18 @@ export default function App() {
   // Feature 16: Where Was I Recovery
   const [showRecovery, setShowRecovery] = useState(false);
   const [sessionContext, setSessionContext] = useState<SessionContext | null>(null);
+  // Captured at load before lastSeen is bumped to "now", so the recovery
+  // check can see how long the user was actually away.
+  const [previousLastSeen, setPreviousLastSeen] = useState<string | null>(null);
 
   // Feature 17: Decision Fatigue Helper
   const [showDecisionHelper, setShowDecisionHelper] = useState(false);
   const [decidedTask, setDecidedTask] = useState<Task | null>(null);
+  // Random message picks captured when the modal opens so unrelated re-renders
+  // don't keep swapping the visible text mid-read.
+  const [decisionPrompt, setDecisionPrompt] = useState('');
+  const [shameMessage, setShameMessage] = useState('');
+  const [taskSwapMessage, setTaskSwapMessage] = useState('');
 
   // Feature 18: Dopamine Menu
   const [showDopamineMenu, setShowDopamineMenu] = useState(false);
@@ -1795,6 +1868,9 @@ export default function App() {
   // Feature 19: Time Blindness Anchors
   const [showTimeAnchor, setShowTimeAnchor] = useState(false);
   const [lastTimeAnchor, setLastTimeAnchor] = useState<string | null>(null);
+  // Picked when the anchor modal opens so the message text doesn't flicker
+  // as unrelated state changes re-render the parent.
+  const [timeAnchorMessage, setTimeAnchorMessage] = useState('');
 
   // Feature 20: Emotional Regulation
   const [showEmotionalCheck, setShowEmotionalCheck] = useState(false);
@@ -1888,40 +1964,50 @@ export default function App() {
 
   // Breathing animation for body double mode
   useEffect(() => {
-    if (bodyDoubleMode) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(breatheAnim, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
-          Animated.timing(breatheAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
+    if (!bodyDoubleMode) {
       breatheAnim.setValue(1);
+      return;
     }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheAnim, { toValue: 1.1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => { loop.stop(); breatheAnim.setValue(1); };
   }, [bodyDoubleMode]);
 
   // Body double check-ins
   useEffect(() => {
     if (bodyDoubleMode && bodyDoubleSession) {
       bodyDoubleTimer.current = setInterval(() => {
+        // Don't keep re-firing (and re-vibrating) while the user is already
+        // looking at the check-in modal — wait for them to respond.
+        if (showBodyDoubleCheckIn) return;
         const timeSinceLastCheckIn = Date.now() - new Date(bodyDoubleSession.lastCheckIn).getTime();
         const checkInInterval = (8 + Math.random() * 7) * 60 * 1000;
         if (timeSinceLastCheckIn > checkInInterval) {
+          setCheckInPrompt(BODY_DOUBLE_CHECK_INS[Math.floor(Math.random() * BODY_DOUBLE_CHECK_INS.length)]);
           setShowBodyDoubleCheckIn(true);
           if (Platform.OS !== 'web') Vibration.vibrate(100);
         }
       }, 60000);
       return () => { if (bodyDoubleTimer.current) clearInterval(bodyDoubleTimer.current); };
     }
-  }, [bodyDoubleMode, bodyDoubleSession]);
+  }, [bodyDoubleMode, bodyDoubleSession, showBodyDoubleCheckIn]);
 
   useEffect(() => {
-    if (isRecording) {
-      Animated.loop(Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      ])).start();
-    } else { pulseAnim.setValue(1); }
+    if (!isRecording) {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulseAnim, { toValue: 1.2, duration: 500, useNativeDriver: true }),
+      Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => { loop.stop(); pulseAnim.setValue(1); };
   }, [isRecording]);
 
   useEffect(() => {
@@ -1941,14 +2027,14 @@ export default function App() {
   useEffect(() => { setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100); }, [messages]);
 
   useEffect(() => {
-    if (!isLoading && syncEnabled && !showEnergyCheck && !showTaskSuggestion && !bodyDoubleMode && messages.length > 0) {
+    if (!isLoading && !showEnergyCheck && !showTaskSuggestion && !bodyDoubleMode && messages.length > 0) {
       const now = Date.now();
       const lastCheck = lastEnergyCheck ? new Date(lastEnergyCheck).getTime() : 0;
       if ((now - lastCheck) / 3600000 > 4 && currentEnergy === null) {
         setTimeout(() => { if (!showSettings && !pendingNudge) setShowEnergyCheck(true); }, 2000);
       }
     }
-  }, [isLoading, syncEnabled, messages.length, lastEnergyCheck, currentEnergy, bodyDoubleMode]);
+  }, [isLoading, messages.length, lastEnergyCheck, currentEnergy, bodyDoubleMode]);
 
   // Calculate focus stats when sessions change
   useEffect(() => {
@@ -1976,46 +2062,63 @@ export default function App() {
 
   // Feature 1: Time Block Notifications
   useEffect(() => {
-    if (timeBlocks.length > 0) {
-      const checkBlocks = setInterval(() => {
-        const upcoming = getUpcomingTimeBlock(timeBlocks);
-        if (upcoming && (!upcomingBlock || upcoming.id !== upcomingBlock.id)) {
-          setUpcomingBlock(upcoming);
-        }
-      }, 60000);
-      return () => clearInterval(checkBlocks);
+    if (timeBlocks.length === 0) {
+      if (upcomingBlock) setUpcomingBlock(null);
+      return;
     }
+    const checkBlocks = () => {
+      const upcoming = getUpcomingTimeBlock(timeBlocks);
+      if (upcoming) {
+        if (!upcomingBlock || upcoming.id !== upcomingBlock.id) setUpcomingBlock(upcoming);
+      } else if (upcomingBlock) {
+        // The previously-flagged block has started or moved out of the
+        // 30-minute window; clear it so the banner doesn't linger forever.
+        setUpcomingBlock(null);
+      }
+    };
+    checkBlocks();
+    const interval = setInterval(checkBlocks, 60000);
+    return () => clearInterval(interval);
   }, [timeBlocks, upcomingBlock]);
 
   // Feature 10: Medication Reminder Check
   useEffect(() => {
-    if (medicationReminders.length > 0) {
-      const checkMeds = setInterval(() => {
-        const now = new Date();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-        const today = now.getDay();
+    if (medicationReminders.length === 0) return;
+    // Window in minutes for catching a scheduled time. Strict minute-equality
+    // missed reminders whenever the interval drifted past the boundary or the
+    // tab was backgrounded; this window catches any scheduled time that fell
+    // in the last 15 minutes (and hasn't been taken today yet).
+    const WINDOW_MIN = 15;
 
-        for (const reminder of medicationReminders) {
-          if (!reminder.enabled || !reminder.days.includes(today)) continue;
+    const checkMeds = () => {
+      if (pendingMedReminder) return;
+      const now = new Date();
+      const today = now.getDay();
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-          for (const time of reminder.times) {
-            const [h, m] = time.split(':');
-            const reminderTime = `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+      for (const reminder of medicationReminders) {
+        if (!reminder.enabled || !reminder.days.includes(today)) continue;
 
-            if (currentTime === reminderTime) {
-              const lastTaken = reminder.lastTaken ? new Date(reminder.lastTaken) : null;
-              const alreadyTakenToday = lastTaken && lastTaken.toDateString() === now.toDateString();
+        const lastTaken = reminder.lastTaken ? new Date(reminder.lastTaken) : null;
+        const alreadyTakenToday = lastTaken && lastTaken.toDateString() === now.toDateString();
+        if (alreadyTakenToday) continue;
 
-              if (!alreadyTakenToday && !pendingMedReminder) {
-                setPendingMedReminder(reminder);
-                setShowMedReminder(true);
-              }
-            }
+        for (const time of reminder.times) {
+          const [hStr, mStr] = time.split(':');
+          const reminderMinutes = (parseInt(hStr, 10) || 0) * 60 + (parseInt(mStr, 10) || 0);
+          const delta = nowMinutes - reminderMinutes;
+          if (delta >= 0 && delta <= WINDOW_MIN) {
+            setPendingMedReminder(reminder);
+            setShowMedReminder(true);
+            return;
           }
         }
-      }, 60000);
-      return () => clearInterval(checkMeds);
-    }
+      }
+    };
+
+    checkMeds();
+    const interval = setInterval(checkMeds, 60000);
+    return () => clearInterval(interval);
   }, [medicationReminders, pendingMedReminder]);
 
   // Feature 11: External Motivation Mode
@@ -2053,21 +2156,21 @@ export default function App() {
 
   // Feature 16: Check for recovery mode on app load
   useEffect(() => {
-    if (!isLoading && memory.facts.lastSeen) {
-      const shouldRecover = shouldShowRecovery(memory.facts.lastSeen);
+    if (!isLoading && previousLastSeen) {
+      const shouldRecover = shouldShowRecovery(previousLastSeen);
       if (shouldRecover && messages.length > 1) {
         const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
         const context: SessionContext = {
           lastActiveTask: bodyDoubleSession?.taskDescription,
           lastTopic: lastUserMessage?.content.slice(0, 50),
-          lastActivity: memory.facts.lastSeen,
-          awayDuration: calculateAwayDuration(memory.facts.lastSeen),
+          lastActivity: previousLastSeen,
+          awayDuration: calculateAwayDuration(previousLastSeen),
         };
         setSessionContext(context);
         setShowRecovery(true);
       }
     }
-  }, [isLoading]);
+  }, [isLoading, previousLastSeen]);
 
   // Feature 19: Time blindness anchors during focus
   useEffect(() => {
@@ -2075,6 +2178,7 @@ export default function App() {
       const anchorInterval = setInterval(() => {
         const hoursSinceAnchor = lastTimeAnchor ? (Date.now() - new Date(lastTimeAnchor).getTime()) / 3600000 : 999;
         if (hoursSinceAnchor >= 0.5) { // Every 30 minutes
+          setTimeAnchorMessage(TIME_ANCHOR_MESSAGES[Math.floor(Math.random() * TIME_ANCHOR_MESSAGES.length)]);
           setShowTimeAnchor(true);
           setLastTimeAnchor(new Date().toISOString());
         }
@@ -2085,22 +2189,29 @@ export default function App() {
 
   // Feature 22: Check for ready impulses
   useEffect(() => {
-    const now = new Date().toISOString();
-    const ready = delayedImpulses.filter(i => i.delayUntil <= now && i.status === 'waiting');
-    setReadyImpulses(ready);
-  }, [delayedImpulses]);
+    // Recompute on data change AND on a 60s tick — the underlying arrays
+    // don't update on their own when a delay expires / a deadline passes,
+    // so without a tick the prompts wouldn't fire during an idle session.
+    const recompute = () => {
+      const now = new Date().toISOString();
+      setReadyImpulses(delayedImpulses.filter(i => i.delayUntil <= now && i.status === 'waiting'));
+      setOverdueCommitments(getOverdueCommitments(commitments));
+      setOverdueContacts(relationshipReminders.filter(needsContact));
+    };
+    recompute();
+    const interval = setInterval(recompute, 60000);
+    return () => clearInterval(interval);
+  }, [delayedImpulses, commitments, relationshipReminders]);
 
   // Feature 23: Calculate social battery
   useEffect(() => {
     const battery = calculateSocialBattery(socialInteractions);
     setSocialBattery(battery);
-  }, [socialInteractions]);
-
-  // Feature 25: Check overdue contacts
-  useEffect(() => {
-    const overdue = relationshipReminders.filter(needsContact);
-    setOverdueContacts(overdue);
-  }, [relationshipReminders]);
+    // Reset the dismissed flag once the battery has recovered, so the
+    // warning can fire again on later dips (including the next day, when
+    // calculateSocialBattery filters out yesterday's interactions).
+    if (battery > 5 && showSocialBattery) setShowSocialBattery(false);
+  }, [socialInteractions, showSocialBattery]);
 
   // Feature 31: Check quiet hours
   useEffect(() => {
@@ -2109,12 +2220,8 @@ export default function App() {
     const interval = setInterval(checkQuiet, 60000);
     return () => clearInterval(interval);
   }, [quietHours]);
-
-  // Feature 35: Check overdue commitments
-  useEffect(() => {
-    const overdue = getOverdueCommitments(commitments);
-    setOverdueCommitments(overdue);
-  }, [commitments]);
+  // overdueContacts and overdueCommitments are recomputed by the impulse
+  // tick effect above (it shares the same 60s cadence).
 
   const initializeApp = async () => {
     try {
@@ -2122,9 +2229,10 @@ export default function App() {
       if (!storedDeviceId) { storedDeviceId = generateDeviceId(); await AsyncStorage.setItem('@nero/deviceId', storedDeviceId); }
       setDeviceId(storedDeviceId);
 
-      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled, savedLastEnergy] = await Promise.all([
+      const [savedApiKey, savedVoiceEnabled, savedAutoSpeak, savedNudgesEnabled, savedSyncEnabled, savedLastEnergy, savedQuietHours] = await Promise.all([
         AsyncStorage.getItem('@nero/apiKey'), AsyncStorage.getItem('@nero/voiceEnabled'), AsyncStorage.getItem('@nero/autoSpeak'),
         AsyncStorage.getItem('@nero/nudgesEnabled'), AsyncStorage.getItem('@nero/syncEnabled'), AsyncStorage.getItem('@nero/lastEnergyCheck'),
+        AsyncStorage.getItem('@nero/quietHours'),
       ]);
 
       if (savedApiKey) setApiKey(JSON.parse(savedApiKey));
@@ -2133,6 +2241,7 @@ export default function App() {
       if (savedNudgesEnabled !== null) setNudgesEnabled(JSON.parse(savedNudgesEnabled));
       if (savedSyncEnabled !== null) setSyncEnabled(JSON.parse(savedSyncEnabled));
       if (savedLastEnergy) setLastEnergyCheck(savedLastEnergy);
+      if (savedQuietHours) setQuietHours(JSON.parse(savedQuietHours));
 
       const shouldSync = savedSyncEnabled === null ? true : JSON.parse(savedSyncEnabled);
       
@@ -2140,7 +2249,7 @@ export default function App() {
         try {
           setSyncStatus('syncing');
           await SupabaseService.initialize(storedDeviceId);
-          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions, cloudTimeBlocks, cloudWaiting, cloudMeds, cloudRoutines, cloudContexts] = await Promise.all([
+          const [cloudMemory, cloudMessages, cloudPatterns, cloudTasks, cloudCompleted, cloudSessions, cloudTimeBlocks, cloudWaiting, cloudMeds, cloudRoutines, cloudContexts, cloudImpulses, cloudSocial, cloudRelationships, cloudWins, cloudCommitments, cloudFlexRoutines, cloudEmotional] = await Promise.all([
             SupabaseService.getMemory(), SupabaseService.getMessages(100), SupabaseService.getPatterns(),
             SupabaseService.getOpenTasks(), SupabaseService.getCompletedTasks(30), SupabaseService.getFocusSessions(30),
             SupabaseService.getTimeBlocks(), SupabaseService.getWaitingItems(), SupabaseService.getMedicationReminders(),
@@ -2150,7 +2259,7 @@ export default function App() {
             SupabaseService.getCommitments(), SupabaseService.getFlexibleRoutines(),
             SupabaseService.getEmotionalHistory(14),
           ]);
-          if (cloudMemory) { cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
+          if (cloudMemory) { setPreviousLastSeen(cloudMemory.facts.lastSeen); cloudMemory.facts.totalConversations += 1; cloudMemory.facts.lastSeen = new Date().toISOString(); setMemory(cloudMemory); await SupabaseService.saveMemory(cloudMemory); }
           if (cloudMessages.length > 0) setMessages(cloudMessages);
           else {
             const welcome: Message = { id: generateId(), role: 'nero', content: "Hey. I'm Nero. I'm here to help you get things done - by actually knowing you. What's on your mind?", timestamp: new Date().toISOString() };
@@ -2160,7 +2269,12 @@ export default function App() {
           setPatterns(cloudPatterns); setOpenTasks(cloudTasks); setCompletedTasks(cloudCompleted); setFocusSessions(cloudSessions);
           setTimeBlocks(cloudTimeBlocks); setWaitingItems(cloudWaiting); setMedicationReminders(cloudMeds);
           setRoutines(cloudRoutines); setEnergyContexts(cloudContexts);
-          SupabaseService.analyzePatterns();
+          setDelayedImpulses(cloudImpulses); setSocialInteractions(cloudSocial); setRelationshipReminders(cloudRelationships);
+          setWinEntries(cloudWins); setCommitments(cloudCommitments); setFlexibleRoutines(cloudFlexRoutines);
+          setEmotionalHistory(cloudEmotional);
+          // Pull patterns again after analyze inserts any new ones, otherwise
+          // the freshly-derived patterns wouldn't show up until the next reload.
+          SupabaseService.analyzePatterns().then(() => SupabaseService.getPatterns()).then(setPatterns).catch(() => {});
           setSyncStatus('synced');
         } catch { setSyncStatus('offline'); await loadLocalData(); }
       } else { setSyncStatus('offline'); await loadLocalData(); }
@@ -2171,7 +2285,7 @@ export default function App() {
   const loadLocalData = async () => {
     const [savedMessages, savedMemory] = await Promise.all([AsyncStorage.getItem('@nero/messages'), AsyncStorage.getItem('@nero/memory')]);
     if (savedMessages) setMessages(JSON.parse(savedMessages));
-    if (savedMemory) { const m = JSON.parse(savedMemory); m.facts.lastSeen = new Date().toISOString(); m.facts.totalConversations += 1; setMemory(m); }
+    if (savedMemory) { const m = JSON.parse(savedMemory); setPreviousLastSeen(m.facts.lastSeen); m.facts.lastSeen = new Date().toISOString(); m.facts.totalConversations += 1; setMemory(m); }
     else {
       const welcome: Message = { id: generateId(), role: 'nero', content: "Hey. I'm Nero. I'm here to help you get things done - by actually knowing you. What's on your mind?", timestamp: new Date().toISOString() };
       setMessages([welcome]);
@@ -2183,6 +2297,13 @@ export default function App() {
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/autoSpeak', JSON.stringify(autoSpeak)); }, [autoSpeak, isLoading]);
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/nudgesEnabled', JSON.stringify(nudgesEnabled)); }, [nudgesEnabled, isLoading]);
   useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/syncEnabled', JSON.stringify(syncEnabled)); }, [syncEnabled, isLoading]);
+  useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/quietHours', JSON.stringify(quietHours)); }, [quietHours, isLoading]);
+  // Auto-persist messages whenever they change so handlers that just call
+  // setMessages (handleTaskComplete, handleBodyDoubleCheckIn, hyperfocus,
+  // RSD/shame/rumination support, etc.) don't have to remember to call
+  // saveData. Without this, those handlers' Nero replies were lost on
+  // offline reload because saveData was never invoked.
+  useEffect(() => { if (!isLoading) AsyncStorage.setItem('@nero/messages', JSON.stringify(messages.slice(-100))); }, [messages, isLoading]);
 
   const saveData = useCallback(async (newMessages: Message[], newMemory: UserMemory) => {
     await Promise.all([AsyncStorage.setItem('@nero/messages', JSON.stringify(newMessages.slice(-100))), AsyncStorage.setItem('@nero/memory', JSON.stringify(newMemory))]);
@@ -2262,13 +2383,14 @@ export default function App() {
   const handleBodyDoubleCheckIn = async (response: 'good' | 'stuck' | 'done' | 'break') => {
     setShowBodyDoubleCheckIn(false);
     
-    if (bodyDoubleSession) {
-      setBodyDoubleSession({
-        ...bodyDoubleSession,
-        lastCheckIn: new Date().toISOString(),
-        checkInCount: bodyDoubleSession.checkInCount + 1,
-      });
-    }
+    // Functional update so a concurrent message-side update of lastCheckIn
+    // (in sendMessage) can't clobber the checkInCount increment via stale
+    // closure.
+    setBodyDoubleSession(prev => prev ? {
+      ...prev,
+      lastCheckIn: new Date().toISOString(),
+      checkInCount: prev.checkInCount + 1,
+    } : prev);
 
     let content = '';
     if (response === 'good') {
@@ -2297,8 +2419,9 @@ export default function App() {
       setShowTransitionSupport(true);
     }
 
-    // Save focus session
-    if (bodyDoubleSession && syncEnabled && SupabaseService.userId) {
+    // Save focus session — always record locally so stats work offline; sync
+    // to the cloud only when sync is on.
+    if (bodyDoubleSession) {
       const focusSession: FocusSession = {
         id: generateId(),
         taskId: bodyDoubleSession.taskId,
@@ -2311,13 +2434,22 @@ export default function App() {
         timeOfDay: getTimeOfDay(),
         dayOfWeek: getDayOfWeek(),
       };
-      await SupabaseService.saveFocusSession(focusSession);
       setFocusSessions(prev => [focusSession, ...prev]);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveFocusSession(focusSession);
     }
 
-    if (bodyDoubleSession?.taskId && completed && syncEnabled) {
-      await SupabaseService.completeTask(bodyDoubleSession.taskId, currentEnergy || undefined);
-      setOpenTasks(prev => prev.filter(t => t.id !== bodyDoubleSession.taskId));
+    if (bodyDoubleSession?.taskId && completed) {
+      const completedTaskId = bodyDoubleSession.taskId;
+      // Move into completedTasks too so Today's Done / Done List / stats
+      // reflect tasks finished via body-double mode.
+      setOpenTasks(prev => {
+        const finished = prev.find(t => t.id === completedTaskId);
+        if (finished) {
+          setCompletedTasks(c => [{ ...finished, status: 'completed', completedAt: new Date().toISOString() }, ...c]);
+        }
+        return prev.filter(t => t.id !== completedTaskId);
+      });
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.completeTask(completedTaskId, currentEnergy || undefined);
     }
 
     const durationStr = formatDuration(duration);
@@ -2342,17 +2474,24 @@ export default function App() {
   };
 
   const handleQuickAdd = async (description: string) => {
-    if (syncEnabled && SupabaseService.userId) {
-      await SupabaseService.createTask(description, currentEnergy || undefined);
-      const freshTasks = await SupabaseService.getOpenTasks();
-      setOpenTasks(freshTasks);
-    }
-    
+    // Always reflect the new task locally so it doesn't vanish when offline /
+    // sync is disabled. Use the Supabase id when available so subsequent ops
+    // line up with the cloud row.
+    const cloudId = (syncEnabled && SupabaseService.userId)
+      ? await SupabaseService.createTask(description, currentEnergy || undefined)
+      : '';
+    const newTask: Task = {
+      id: cloudId || generateId(),
+      description,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      energyAtCreation: currentEnergy || undefined,
+    };
+    setOpenTasks(prev => [...prev, newTask]);
+
     const neroMessage: Message = { id: generateId(), role: 'nero', content: `Got it. "${description}" - added.`, timestamp: new Date().toISOString() };
-    const newMessages = [...messages, neroMessage];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, neroMessage]);
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
-    await saveData(newMessages, memory);
   };
 
   const handleTaskComplete = async (task: Task) => {
@@ -2410,13 +2549,14 @@ export default function App() {
 
     // Feature 27: Shame Spiral Detection
     if (detectShameSpiral(text) && !showShameSupport) {
+      setShameMessage(SHAME_RESPONSES[Math.floor(Math.random() * SHAME_RESPONSES.length)]);
       setShowShameSupport(true);
       setIsThinking(false);
       return;
     }
 
     if (bodyDoubleMode && bodyDoubleSession) {
-      setBodyDoubleSession({ ...bodyDoubleSession, lastCheckIn: new Date().toISOString() });
+      setBodyDoubleSession(prev => prev ? { ...prev, lastCheckIn: new Date().toISOString() } : prev);
     }
 
     const analysis = analyzeMessage(text);
@@ -2424,11 +2564,11 @@ export default function App() {
     
     for (const completion of analysis.completions) {
       const matchingTask = openTasks.find(t => t.description.toLowerCase().includes(completion.toLowerCase()) || completion.toLowerCase().includes(t.description.toLowerCase()));
-      if (matchingTask && syncEnabled) {
-        await SupabaseService.completeTask(matchingTask.id, currentEnergy || undefined);
+      if (matchingTask) {
         setOpenTasks(prev => prev.filter(t => t.id !== matchingTask.id));
         setCompletedTasks(prev => [{ ...matchingTask, status: 'completed', completedAt: new Date().toISOString() }, ...prev]);
-        
+        if (syncEnabled && SupabaseService.userId) await SupabaseService.completeTask(matchingTask.id, currentEnergy || undefined);
+
         if (bodyDoubleMode && bodyDoubleSession?.taskId === matchingTask.id) {
           await endBodyDoubleMode(true);
           setIsThinking(false);
@@ -2436,10 +2576,23 @@ export default function App() {
         }
       }
     }
-    
-    for (const task of analysis.newTasks) {
-      if (syncEnabled && SupabaseService.userId) await SupabaseService.createTask(task, currentEnergy || undefined);
-      if (!updatedMemory.threads.commitments.includes(task)) updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), task];
+
+    for (const description of analysis.newTasks) {
+      // Always reflect new tasks locally so they show up in openTasks even
+      // when offline; sync to Supabase when enabled. The Supabase id is used
+      // when available so subsequent ops match the cloud row.
+      const cloudId = (syncEnabled && SupabaseService.userId)
+        ? await SupabaseService.createTask(description, currentEnergy || undefined)
+        : '';
+      const newTask: Task = {
+        id: cloudId || generateId(),
+        description,
+        status: 'open',
+        createdAt: new Date().toISOString(),
+        energyAtCreation: currentEnergy || undefined,
+      };
+      setOpenTasks(prev => [...prev, newTask]);
+      if (!updatedMemory.threads.commitments.includes(description)) updatedMemory.threads.commitments = [...updatedMemory.threads.commitments.slice(-4), description];
     }
     
     for (const mem of analysis.memories) {
@@ -2450,12 +2603,14 @@ export default function App() {
     updatedMemory.facts.lastSeen = new Date().toISOString();
     setMemory(updatedMemory);
 
+    let tasksForContext = openTasks;
     if (syncEnabled && SupabaseService.userId) {
       const freshTasks = await SupabaseService.getOpenTasks();
       setOpenTasks(freshTasks);
+      tasksForContext = freshTasks;
     }
 
-    const response = await callNero(newMessages, updatedMemory, patterns, currentEnergy, openTasks, apiKey, isVoice, bodyDoubleMode);
+    const response = await callNero(newMessages, updatedMemory, patterns, currentEnergy, tasksForContext, apiKey, isVoice, bodyDoubleMode);
     const neroMessage: Message = { id: generateId(), role: 'nero', content: response, timestamp: new Date().toISOString() };
     const finalMessages = [...newMessages, neroMessage];
     setMessages(finalMessages);
@@ -2553,7 +2708,10 @@ export default function App() {
     } else if (action === 'break') {
       content = "Smart. Take 5-10 minutes. Move around, drink water, rest your eyes. I'll be here.";
     } else {
-      await endBodyDoubleMode(true);
+      // Hyperfocus warning's "end" choice means take a forced break, not
+      // "I finished the task". Pass completed=false so endBodyDoubleMode
+      // doesn't mark the underlying task as done and pull it from openTasks.
+      await endBodyDoubleMode(false);
       return;
     }
 
@@ -2615,8 +2773,13 @@ export default function App() {
 
   // Feature 10: Medication Reminder Response
   const handleMedReminderResponse = async (taken: boolean) => {
-    if (pendingMedReminder && taken && syncEnabled && SupabaseService.userId) {
-      await SupabaseService.markMedicationTaken(pendingMedReminder.id);
+    if (pendingMedReminder && taken) {
+      // Update local state so the reminder check effect (which gates on
+      // reminder.lastTaken) doesn't re-prompt for the same dose seconds later.
+      const reminderId = pendingMedReminder.id;
+      const takenAt = new Date().toISOString();
+      setMedicationReminders(prev => prev.map(r => r.id === reminderId ? { ...r, lastTaken: takenAt } : r));
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.markMedicationTaken(reminderId);
     }
     setShowMedReminder(false);
     setPendingMedReminder(null);
@@ -2670,6 +2833,28 @@ export default function App() {
 
   // Feature 15: Crisis Mode
   const enterCrisisMode = () => {
+    // If a body-double session is in progress, persist it as an incomplete
+    // focus session before tearing it down — otherwise the user loses the
+    // entire session record (no entry in stats, nothing in Supabase).
+    if (bodyDoubleSession) {
+      const focusSession: FocusSession = {
+        id: generateId(),
+        taskId: bodyDoubleSession.taskId,
+        taskDescription: bodyDoubleSession.taskDescription,
+        startedAt: bodyDoubleSession.startedAt,
+        endedAt: new Date().toISOString(),
+        durationMs: Date.now() - new Date(bodyDoubleSession.startedAt).getTime(),
+        completed: false,
+        checkInCount: bodyDoubleSession.checkInCount,
+        timeOfDay: getTimeOfDay(),
+        dayOfWeek: getDayOfWeek(),
+      };
+      setFocusSessions(prev => [focusSession, ...prev]);
+      setBodyDoubleSession(null);
+      // Fire-and-forget so the crisis UI shows immediately, not after a
+      // possibly-slow cloud round-trip.
+      if (syncEnabled && SupabaseService.userId) SupabaseService.saveFocusSession(focusSession);
+    }
     setCrisisMode(true);
     setBodyDoubleMode(false);
     setBreathingPhase('inhale');
@@ -2693,18 +2878,22 @@ export default function App() {
   useEffect(() => {
     if (crisisMode) {
       const pattern = BREATHING_PATTERNS.calm;
+      const timeouts: ReturnType<typeof setTimeout>[] = [];
       const breathingCycle = () => {
         setBreathingPhase('inhale');
-        setTimeout(() => setBreathingPhase('hold'), pattern.inhale * 1000);
-        setTimeout(() => {
+        timeouts.push(setTimeout(() => setBreathingPhase('hold'), pattern.inhale * 1000));
+        timeouts.push(setTimeout(() => {
           setBreathingPhase('exhale');
           setBreathingCount(prev => prev + 1);
-        }, (pattern.inhale + pattern.hold) * 1000);
+        }, (pattern.inhale + pattern.hold) * 1000));
       };
 
       breathingCycle();
       const interval = setInterval(breathingCycle, (pattern.inhale + pattern.hold + pattern.exhale) * 1000);
-      return () => clearInterval(interval);
+      return () => {
+        clearInterval(interval);
+        timeouts.forEach(clearTimeout);
+      };
     }
   }, [crisisMode]);
 
@@ -2729,6 +2918,7 @@ export default function App() {
   const handleDecisionHelp = () => {
     const picked = pickRandomTask(openTasks);
     setDecidedTask(picked);
+    setDecisionPrompt(DECISION_PROMPTS[Math.floor(Math.random() * DECISION_PROMPTS.length)]);
     setShowDecisionHelper(true);
   };
 
@@ -2985,7 +3175,7 @@ export default function App() {
   };
 
   // Feature 33: Sensory Overload Mode
-  const toggleSensoryOverload = () => {
+  const toggleSensoryOverload = async () => {
     setSensoryOverloadMode(prev => !prev);
     if (!sensoryOverloadMode) {
       // Entering overload mode
@@ -2994,8 +3184,8 @@ export default function App() {
         content: "Simplified mode on. Less noise. Just breathe.",
         timestamp: new Date().toISOString(),
       };
-      const newMessages = [...messages, neroMessage];
-      setMessages(newMessages);
+      setMessages(prev => [...prev, neroMessage]);
+      if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(neroMessage);
     }
   };
 
@@ -3004,6 +3194,7 @@ export default function App() {
     const current = bodyDoubleSession?.taskId ? openTasks.find(t => t.id === bodyDoubleSession.taskId) : null;
     const swap = findSwapTask(current || null, openTasks);
     setSwapSuggestion(swap);
+    setTaskSwapMessage(TASK_SWAP_MESSAGES[Math.floor(Math.random() * TASK_SWAP_MESSAGES.length)]);
     setShowTaskSwap(true);
   };
 
@@ -3059,6 +3250,9 @@ export default function App() {
     if (syncEnabled && SupabaseService.userId) await SupabaseService.clearMessages();
     const confirm: Message = { id: generateId(), role: 'nero', content: "Fresh start. I still remember you.", timestamp: new Date().toISOString() };
     setMessages([confirm]);
+    // Also clear the local cache; otherwise the next offline load restores the
+    // messages the user just deleted.
+    await AsyncStorage.setItem('@nero/messages', JSON.stringify([confirm]));
     if (syncEnabled && SupabaseService.userId) await SupabaseService.saveMessage(confirm);
     setShowSettings(false);
   };
@@ -3070,12 +3264,11 @@ export default function App() {
 
   // Body Double Check-in
   if (showBodyDoubleCheckIn && bodyDoubleMode) {
-    const checkInMessage = BODY_DOUBLE_CHECK_INS[Math.floor(Math.random() * BODY_DOUBLE_CHECK_INS.length)];
     return (
       <SafeAreaView style={[styles.container, styles.bodyDoubleContainer]}>
         <StatusBar style="light" />
         <View style={styles.checkInCard}>
-          <Text style={styles.checkInMessage}>{checkInMessage}</Text>
+          <Text style={styles.checkInMessage}>{checkInPrompt}</Text>
           <View style={styles.checkInButtons}>
             <TouchableOpacity style={styles.checkInButton} onPress={() => handleBodyDoubleCheckIn('good')}><Text style={styles.checkInButtonText}>👍 Good</Text></TouchableOpacity>
             <TouchableOpacity style={styles.checkInButton} onPress={() => handleBodyDoubleCheckIn('stuck')}><Text style={styles.checkInButtonText}>😕 Stuck</Text></TouchableOpacity>
@@ -3106,7 +3299,14 @@ export default function App() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.skipButton} onPress={() => setShowEnergyCheck(false)}><Text style={styles.skipButtonText}>Skip</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.skipButton} onPress={() => {
+              // Record the dismissal so the auto-prompt effect doesn't pop the
+              // modal back open 2 seconds after the next message.
+              const now = new Date().toISOString();
+              setLastEnergyCheck(now);
+              AsyncStorage.setItem('@nero/lastEnergyCheck', now);
+              setShowEnergyCheck(false);
+            }}><Text style={styles.skipButtonText}>Skip</Text></TouchableOpacity>
           </View>
         </View>
       </SafeAreaView>
@@ -3276,7 +3476,7 @@ export default function App() {
         <View style={styles.decisionContainer}>
           <View style={styles.decisionCard}>
             <Text style={styles.decisionTitle}>I'll decide for you</Text>
-            <Text style={styles.decisionMessage}>{DECISION_PROMPTS[Math.floor(Math.random() * DECISION_PROMPTS.length)]}</Text>
+            <Text style={styles.decisionMessage}>{decisionPrompt}</Text>
             {decidedTask && (
               <View style={styles.decisionTaskCard}>
                 <Text style={styles.decisionTaskText}>{decidedTask.description}</Text>
@@ -3333,7 +3533,7 @@ export default function App() {
         <StatusBar style="light" />
         <View style={styles.timeAnchorCard}>
           <Text style={styles.timeAnchorTitle}>Time Check</Text>
-          <Text style={styles.timeAnchorMessage}>{TIME_ANCHOR_MESSAGES[Math.floor(Math.random() * TIME_ANCHOR_MESSAGES.length)].replace('{duration}', timeString)}</Text>
+          <Text style={styles.timeAnchorMessage}>{timeAnchorMessage.replace('{duration}', timeString)}</Text>
           <TouchableOpacity style={styles.timeAnchorButton} onPress={handleTimeAnchorDismiss}>
             <Text style={styles.timeAnchorButtonText}>Got it</Text>
           </TouchableOpacity>
@@ -3487,7 +3687,6 @@ export default function App() {
 
   // Feature 27: Shame Spiral Support
   if (showShameSupport) {
-    const shameMessage = SHAME_RESPONSES[Math.floor(Math.random() * SHAME_RESPONSES.length)];
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
@@ -3552,7 +3751,7 @@ export default function App() {
         <View style={styles.swapContainer}>
           <View style={styles.swapCard}>
             <Text style={styles.swapTitle}>Stuck? Try switching</Text>
-            <Text style={styles.swapMessage}>{TASK_SWAP_MESSAGES[Math.floor(Math.random() * TASK_SWAP_MESSAGES.length)]}</Text>
+            <Text style={styles.swapMessage}>{taskSwapMessage}</Text>
             <View style={styles.swapTaskCard}>
               <Text style={styles.swapTaskText}>{swapSuggestion.description}</Text>
             </View>
